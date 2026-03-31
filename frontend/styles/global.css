@@ -1,0 +1,49 @@
+:root{
+  --bg: #0f1724;
+  --card: #0b1220;
+  --muted: #9aa4b2;
+  --accent: #6c5ce7;
+  --accent-2: #00d4ff;
+  --glass: rgba(255,255,255,0.04);
+  --success: #4ade80;
+}
+
+*{box-sizing:border-box}
+html,body,#__next{height:100%;}
+body{
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg, #071021 0%, #071a2a 100%);
+  color: #e6eef6;
+  -webkit-font-smoothing:antialiased;
+}
+
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:220px;padding:20px;border-right:1px solid rgba(255,255,255,0.03);background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent)}
+.sidebar h3{margin:0 0 12px 0;font-size:18px}
+.nav-list{list-style:none;padding:0;margin:0}
+.nav-list li{margin:8px 0}
+.nav-list a{color:var(--muted);text-decoration:none;padding:8px 10px;display:inline-block;border-radius:6px}
+.nav-list a.active,.nav-list a:hover{color:var(--accent);background:var(--glass)}
+
+.page{flex:1;padding:24px}
+.page h1{margin-top:0}
+
+.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:10px;padding:14px;color:inherit;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.card-title{font-weight:600}
+.card-body{min-height:80px}
+
+.list-panel{width:320px}
+.list-item{margin-bottom:10px}
+.list-item button{width:100%;text-align:left;padding:10px;border-radius:8px;border:0;background:transparent;color:var(--muted);cursor:pointer}
+.list-item button:hover{background:var(--glass);color:var(--accent)}
+
+.metric-grid{display:flex;gap:12px;margin-top:12px}
+.metric-pill{background:rgba(255,255,255,0.03);padding:10px;border-radius:8px;min-width:120px}
+.metric-value{font-size:18px;font-weight:700}
+.metric-label{font-size:12px;color:var(--muted)}
+
+.chart-container{height:320px}
+
+.pre-json{background:rgba(0,0,0,0.25);padding:8px;border-radius:6px;overflow:auto;color:var(--muted);font-size:12px}

@@ -1,0 +1,4 @@
+httpx==0.24.0
+python-dotenv==1.0.0
+prometheus_client==0.17.0
+python-json-logger==2.0.7

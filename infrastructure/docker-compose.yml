@@ -1,0 +1,76 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: monitoring
+      POSTGRES_PASSWORD: monitoring
+      POSTGRES_DB: monitoring
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  backend:
+    build:
+      context: ../backend
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    environment:
+      - DATABASE_URL=postgresql://monitoring:monitoring@postgres:5432/monitoring
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../frontend
+    ports:
+      - "3000:3000"
+
+  # Monitoring stack removed: monitoring is integrated into backend (no external Prometheus/Grafana/ELK)
+
+  agent:
+    build:
+      context: ../services/agent
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - METRICS_PORT=8001
+      - SERVER_ID=srv-1
+    ports:
+      - "8001:8001"
+
+  prober:
+    build:
+      context: ../services/prober
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+      - METRICS_PORT=8002
+      - TARGET_URL=https://example.com
+    ports:
+      - "8002:8002"
+
+volumes:
+  pgdata:
+
+networks:
+  default:
+    driver: bridge

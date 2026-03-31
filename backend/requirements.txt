@@ -1,0 +1,16 @@
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+python-dotenv==1.0.0
+websockets==11.0.3
+httpx==0.24.0
+aioredis==2.0.1
+prometheus_client==0.17.0
+SQLAlchemy==1.4.50
+asyncpg==0.27.0
+alembic==1.11.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+email-validator==2.0.0
+python-multipart==0.0.6
+asyncssh==2.17.0
+pywinrm==0.4.3
