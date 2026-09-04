@@ -15,6 +15,8 @@ RUN apt-get update \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY ./app /app/app
+COPY ./alembic.ini /app/alembic.ini
+COPY ./migrations /app/migrations
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

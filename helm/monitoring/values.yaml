@@ -1,0 +1,126 @@
+replicaCount: 1
+
+image:
+  backend:
+    repository: monitoring-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: monitoring-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  worker:
+    repository: monitoring-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+service:
+  backend:
+    type: ClusterIP
+    port: 8000
+  frontend:
+    type: ClusterIP
+    port: 3000
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: monitoring.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend: backend
+        - path: /
+          pathType: Prefix
+          backend: frontend
+  tls: []
+
+autoscaling:
+  backend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  frontend:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  worker:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 80
+
+resources:
+  backend:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  frontend:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  worker:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Bundled Bitnami subcharts (run `helm dependency update` before install/upgrade
+# to fetch them). Deployed in-cluster as "<release-name>-redis-master" and
+# "<release-name>-postgresql" — point env.backend.REDIS_URL / DATABASE_URL at
+# those hostnames, or set postgresql.enabled/redis.enabled to false and point
+# at an external managed instance instead.
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "changeme"
+    database: monitoring
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+env:
+  backend:
+    ENVIRONMENT: production
+    DATABASE_URL: ""  # Set via secret or override
+    REDIS_URL: ""     # Set via secret or override
+    SECRET_KEY: ""    # Set via secret
+    INGEST_API_KEY: "" # Set via secret
+    SENTRY_DSN: ""
+    ALLOWED_ORIGINS: ""
+  worker:
+    ENVIRONMENT: production
+
+secrets:
+  create: true
+  name: monitoring-secrets
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

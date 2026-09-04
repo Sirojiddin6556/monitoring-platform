@@ -1,6 +1,7 @@
 import {useEffect, useState, useCallback} from 'react'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
+import apiFetch from '../lib/api'
 
 function StatBox({label, value, color}) {
   return (
@@ -44,6 +45,23 @@ function formatUptime(sec) {
   return `${m}м`
 }
 
+function vmCpuCount(vm) {
+  return vm.cpu_count ?? vm.cpus ?? vm.cpu ?? 0
+}
+
+function vmCpuUsage(vm) {
+  const value = vm.cpu_usage ?? vm.cpu_percent ?? vm.cpu_load
+  return typeof value === 'number' ? value : Number(value || 0)
+}
+
+function vmRamMb(vm) {
+  return vm.ram_mb ?? vm.memory_mb ?? vm.mem_mb ?? vm.ram ?? null
+}
+
+function vmDiskGb(vm) {
+  return vm.disk_gb ?? vm.storage_gb ?? vm.disk ?? null
+}
+
 export default function VMs() {
   const [vms, setVms] = useState([])
   const [stats, setStats] = useState({total:0,running:0,stopped:0,paused:0})
@@ -61,7 +79,7 @@ export default function VMs() {
 
   const loadData = useCallback(async () => {
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       const [vmData, hvData] = await Promise.all([
         apiFetch('/api/vm/all'),
         apiFetch('/api/vm/hypervisors'),
@@ -84,7 +102,7 @@ export default function VMs() {
     if(!addForm.name.trim()) { setAddError('Имя обязательно'); return }
     setAddLoading(true)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch('/api/vm/hypervisors', {method:'POST',body:JSON.stringify(addForm)})
       setAddForm({name:'',hv_type:'hyperv',api_url:'',username:'',password:'',token:'',server_id:''})
       setShowAdd(false)
@@ -96,7 +114,7 @@ export default function VMs() {
   async function handleDeleteHv(id) {
     if(!confirm('Удалить гипервизор?')) return
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch(`/api/vm/hypervisors/${id}`, {method:'DELETE'})
       await loadData()
     } catch(e) {}
@@ -104,7 +122,7 @@ export default function VMs() {
 
   async function handleRefresh(id) {
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch(`/api/vm/hypervisors/${id}/refresh`, {method:'POST'})
       await loadData()
     } catch(e) {}
@@ -128,7 +146,7 @@ export default function VMs() {
   const inputStyle = {padding:'6px 10px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="admin">
       <div className="app-shell">
         <Sidebar/>
         <div className="page" style={{maxWidth:'100%'}}>
@@ -324,10 +342,10 @@ export default function VMs() {
                             <td style={tdStyle}><span style={{fontWeight:600,color:'#fff'}}>{vm.name||'—'}</span></td>
                             <td style={tdStyle}><StateDot state={vm.state}/></td>
                             <td style={tdStyle}><TypeBadge type={vm.type||vm.hv_type}/></td>
-                            <td style={tdStyle}>{vm.cpu_count||0} vCPU</td>
-                            <td style={tdStyle}>{vm.cpu_usage!=null && vm.cpu_usage>0 ? <span style={{color:vm.cpu_usage>80?'#ef4444':vm.cpu_usage>50?'#facc15':'#4ade80'}}>{vm.cpu_usage}%</span> : <span style={{color:'#9aa4b2'}}>—</span>}</td>
-                            <td style={tdStyle}>{vm.ram_mb ? `${vm.ram_mb} MB` : '—'}</td>
-                            <td style={tdStyle}>{vm.disk_gb ? `${vm.disk_gb} GB` : '—'}</td>
+                            <td style={tdStyle}>{vmCpuCount(vm)} vCPU</td>
+                            <td style={tdStyle}>{vmCpuUsage(vm)>0 ? <span style={{color:vmCpuUsage(vm)>80?'#ef4444':vmCpuUsage(vm)>50?'#facc15':'#4ade80'}}>{vmCpuUsage(vm)}%</span> : <span style={{color:'#9aa4b2'}}>—</span>}</td>
+                            <td style={tdStyle}>{vmRamMb(vm) ? `${vmRamMb(vm)} MB` : '—'}</td>
+                            <td style={tdStyle}>{vmDiskGb(vm) ? `${vmDiskGb(vm)} GB` : '—'}</td>
                             <td style={tdStyle}>{formatUptime(vm.uptime)}</td>
                             <td style={tdStyle}>
                               <span style={{padding:'2px 8px',borderRadius:4,background:'#1a294040',color:'#9aa4b2',fontSize:10}}>{vm.source_name||'—'}</span>

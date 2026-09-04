@@ -1,6 +1,8 @@
 import {useEffect, useState, useRef} from 'react'
+import {useRouter} from 'next/router'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
+import apiFetch from '../lib/api'
 
 function AlertBadge({severity}){
   const colors = {critical:'#ef4444',warning:'#facc15',info:'#3b82f6',resolved:'#4ade80'}
@@ -26,11 +28,13 @@ export default function Alerts() {
   const [filter, setFilter] = useState('all') // all, active, critical, warning, resolved
   const [alertSearch, setAlertSearch] = useState('')
   const wsRef = useRef(null)
+  const router = useRouter()
+  const highlightedAlertId = router.query.alertId ? String(router.query.alertId) : null
 
   const loadAlerts = async () => {
     try {
       setError(null)
-      const {default: apiFetch} = await import('../lib/api')
+
       const [alertsRes, statsRes] = await Promise.all([
         apiFetch('/api/alerts?limit=100'),
         apiFetch('/api/alerts/stats')
@@ -53,7 +57,8 @@ export default function Alerts() {
   // WebSocket for real-time alerts
   useEffect(() => {
     const base = process.env.NEXT_PUBLIC_API_URL || ''
-    const wsUrl = base.replace('http', 'ws') + '/ws'
+    const wsToken = localStorage.getItem('token')
+    const wsUrl = base.replace('http', 'ws') + '/ws' + (wsToken ? `?token=${wsToken}` : '')
     try {
       wsRef.current = new WebSocket(wsUrl)
       wsRef.current.onmessage = (evt) => {
@@ -68,7 +73,7 @@ export default function Alerts() {
 
   async function resolveAlert(alertId) {
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch(`/api/alerts/${alertId}/resolve`, {method: 'POST'})
       await loadAlerts()
     } catch(err) { setError('Ошибка при разрешении алерта') }
@@ -77,7 +82,7 @@ export default function Alerts() {
   async function clearResolved() {
     if(!confirm('Удалить все разрешённые алерты?')) return
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch('/api/alerts', {method: 'DELETE'})
       await loadAlerts()
     } catch(err) { setError('Ошибка очистки') }
@@ -99,7 +104,7 @@ export default function Alerts() {
     <ProtectedRoute>
       <div className="app-shell">
         <Sidebar />
-        <div className="page" style={{maxWidth:'100%'}}>
+        <div className="page" style={{maxWidth:'100%',height:'100vh',overflow:'hidden',display:'flex',flexDirection:'column'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
           <h1 style={{margin:0}}>Алерты</h1>
           <div style={{display:'flex',gap:8}}>
@@ -136,11 +141,17 @@ export default function Alerts() {
           </div>
         )}
 
-        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'flex',flexDirection:'column',gap:8,flex:1,minHeight:0,overflowY:'auto',paddingRight:4}}>
           {filtered.map((a, i) => {
             const sevColor = {critical:'#ef4444',warning:'#facc15',info:'#3b82f6'}[a.severity] || '#9aa4b2'
+            const isHighlighted = highlightedAlertId && String(a.id) === highlightedAlertId
             return (
-              <div key={a.id||i} className="card" style={{padding:'14px 16px',borderLeft:`3px solid ${a.is_active?sevColor:'#4ade80'}`,opacity:a.is_active?1:0.6}}>
+              <div
+                id={`alert-${a.id}`}
+                key={a.id||i}
+                className="card"
+                style={{padding:'14px 16px',borderLeft:`3px solid ${a.is_active?sevColor:'#4ade80'}`,opacity:a.is_active?1:0.6,boxShadow:isHighlighted?'0 0 0 2px #6c5ce7 inset':'none'}}
+              >
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
                   <div style={{flex:1}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>

@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
+import apiFetch from '../lib/api'
 
 const SETTING_LABELS = {
   monitoring_enabled: {label: 'Автоматический мониторинг', type: 'toggle', group: 'general'},
@@ -42,7 +43,7 @@ export default function SettingsPage() {
     setLoading(true)
     setError(null)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       const res = await apiFetch('/api/settings')
       const map = {}
       for (const s of (res.settings || [])) {
@@ -76,7 +77,7 @@ export default function SettingsPage() {
     setError(null)
     setSuccess(null)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       // Отправить только изменённые
       const changed = {}
       for (const k of Object.keys(settings)) {
@@ -106,7 +107,7 @@ export default function SettingsPage() {
     setSaving(true)
     setError(null)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       const res = await apiFetch('/api/settings/reset', {method: 'POST'})
       if (res.settings) {
         setSettings(res.settings)
@@ -125,7 +126,7 @@ export default function SettingsPage() {
     if (!confirm(`Удалить данные старше ${hours} часов?`)) return
     setCleanupResult(null)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       const res = await apiFetch('/api/data/cleanup', {method: 'POST'})
       setCleanupResult(res.message || 'Очистка выполнена')
     } catch (err) {
@@ -212,10 +213,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="admin">
       <div className="app-shell">
         <Sidebar />
-        <main className="main-content">
+        <div className="page">
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
             <h1 style={{fontSize: 22, color: '#fff', margin: 0}}>Настройки мониторинга</h1>
             {isAdmin && hasChanges() && (
@@ -319,7 +320,7 @@ export default function SettingsPage() {
               )}
             </>
           )}
-        </main>
+        </div>
       </div>
     </ProtectedRoute>
   )

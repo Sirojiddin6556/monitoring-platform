@@ -14,6 +14,7 @@ out/
 # Environment
 .env
 .env.local
+.env.prod
 *.env
 
 # IDE
@@ -31,3 +32,36 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Logs
+*.log
+backend_out.log
+backend_err.log
+
+# Runtime / local dev
+.runtime/
+monitoring.db
+
+# Agent build artifacts (managed separately)
+agent/build/
+agent/dist/
+agent/__pycache__/
+
+# Go compiled binaries
+agent/MonitoringAgent.exe
+agent/MonitoringAgent.exe~
+agent/MonitoringAgentInstaller.exe
+agent/installer.exe
+agent/installer/installer.exe
+
+# Agent local runtime state
+agent/agent_heartbeat.json
+
+# GUI build output
+agent/gui-dist/
+agent/gui/bin/
+agent/gui/obj/
+agent/monitoring-agent-linux-*
+agent/monitoring-agent-macos-*
+agent/monitoring-agent
+

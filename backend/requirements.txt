@@ -2,11 +2,12 @@ fastapi==0.95.2
 uvicorn[standard]==0.22.0
 python-dotenv==1.0.0
 websockets==11.0.3
-httpx==0.24.0
+httpx==0.28.1
 aioredis==2.0.1
 prometheus_client==0.17.0
 SQLAlchemy==1.4.50
 asyncpg==0.27.0
+psycopg2-binary==2.9.9
 alembic==1.11.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
@@ -14,3 +15,10 @@ email-validator==2.0.0
 python-multipart==0.0.6
 asyncssh==2.17.0
 pywinrm==0.4.3
+psutil==7.2.2
+cryptography>=41.0.0
+# Sprint 1: Observability
+sentry-sdk[fastapi]==1.40.0
+# Sprint 4: Background task queue
+celery[redis]==5.3.6
+redis==5.0.1

@@ -1,0 +1,301 @@
+<Window x:Class="AgentGui.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Monitoring Agent" Height="640" Width="880"
+        MinHeight="520" MinWidth="720"
+        Background="{StaticResource BrBg}"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI">
+
+    <Window.Resources>
+        <!-- inline helpers -->
+        <Style x:Key="KeyLabel" TargetType="TextBlock">
+            <Setter Property="Foreground"  Value="{StaticResource BrFg2}"/>
+            <Setter Property="FontSize"    Value="11"/>
+            <Setter Property="Width"       Value="160"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ValLabel" TargetType="TextBlock">
+            <Setter Property="Foreground"  Value="{StaticResource BrFg}"/>
+            <Setter Property="FontSize"    Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SectionLabel" TargetType="TextBlock">
+            <Setter Property="Foreground"  Value="{StaticResource BrFg2}"/>
+            <Setter Property="FontSize"    Value="10"/>
+            <Setter Property="Margin"      Value="0,0,0,4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="50"/>   <!-- top bar -->
+            <RowDefinition Height="*"/>    <!-- content -->
+            <RowDefinition Height="54"/>   <!-- bottom bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════════════════════
+             TOP BAR
+        ══════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" Background="{StaticResource BrBg3}">
+            <Grid Margin="16,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="⬡" FontSize="18" Foreground="{StaticResource BrAccent}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock x:Name="TitleLabel"
+                               Text="Monitoring Agent"
+                               FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource BrFg}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <TextBlock x:Name="StatusLabel" Text="Остановлен"
+                               FontSize="12" Foreground="{StaticResource BrFg2}"
+                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <Ellipse x:Name="StatusDot" Width="12" Height="12"
+                             Fill="{StaticResource BrRed}"
+                             VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════
+             TAB CONTENT
+        ══════════════════════════════════════════════════════════ -->
+        <TabControl Grid.Row="1" x:Name="Tabs">
+
+            <!-- ── DASHBOARD ──────────────────────────────────── -->
+            <TabItem Header="📊  Дашборд">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource BrBg}">
+                    <StackPanel Margin="16,14,16,8">
+
+                        <!-- Live metric cards -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- CPU -->
+                            <Border Grid.Column="0" Background="{StaticResource BrBg2}"
+                                    CornerRadius="7" Padding="16,12">
+                                <StackPanel>
+                                    <TextBlock Text="CPU" Style="{StaticResource SectionLabel}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock x:Name="CpuVal" Text="—"
+                                                   FontSize="34" FontWeight="Bold"
+                                                   Foreground="{StaticResource BrGreen}"/>
+                                        <TextBlock Text="%" FontSize="14"
+                                                   Foreground="{StaticResource BrFg2}"
+                                                   VerticalAlignment="Bottom" Margin="2,0,0,5"/>
+                                    </StackPanel>
+                                    <ProgressBar x:Name="CpuBar" Style="{StaticResource MetricBar}"
+                                                 Foreground="{StaticResource BrGreen}"
+                                                 Maximum="100" Value="0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- RAM -->
+                            <Border Grid.Column="2" Background="{StaticResource BrBg2}"
+                                    CornerRadius="7" Padding="16,12">
+                                <StackPanel>
+                                    <TextBlock Text="RAM" Style="{StaticResource SectionLabel}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock x:Name="RamVal" Text="—"
+                                                   FontSize="34" FontWeight="Bold"
+                                                   Foreground="{StaticResource BrAccent}"/>
+                                        <TextBlock Text="%" FontSize="14"
+                                                   Foreground="{StaticResource BrFg2}"
+                                                   VerticalAlignment="Bottom" Margin="2,0,0,5"/>
+                                    </StackPanel>
+                                    <ProgressBar x:Name="RamBar" Style="{StaticResource MetricBar}"
+                                                 Foreground="{StaticResource BrAccent}"
+                                                 Maximum="100" Value="0"/>
+                                    <TextBlock x:Name="RamDetail" Text=""
+                                               FontSize="10" Foreground="{StaticResource BrFg2}"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Disk -->
+                            <Border Grid.Column="4" Background="{StaticResource BrBg2}"
+                                    CornerRadius="7" Padding="16,12">
+                                <StackPanel>
+                                    <TextBlock Text="Диск" Style="{StaticResource SectionLabel}"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock x:Name="DiskVal" Text="—"
+                                                   FontSize="34" FontWeight="Bold"
+                                                   Foreground="{StaticResource BrCyan}"/>
+                                        <TextBlock Text="%" FontSize="14"
+                                                   Foreground="{StaticResource BrFg2}"
+                                                   VerticalAlignment="Bottom" Margin="2,0,0,5"/>
+                                    </StackPanel>
+                                    <ProgressBar x:Name="DiskBar" Style="{StaticResource MetricBar}"
+                                                 Foreground="{StaticResource BrCyan}"
+                                                 Maximum="100" Value="0"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- Agent info card -->
+                        <Border Background="{StaticResource BrBg2}" CornerRadius="7" Padding="16,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Backend URL" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoBackend" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Server ID" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoServerId" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Интервал" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoInterval" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1">
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Версия агента" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoVersion" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="PID" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoPid" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                                        <TextBlock Text="Последняя отправка" Style="{StaticResource KeyLabel}"/>
+                                        <TextBlock x:Name="InfoLastSent" Text="—" Style="{StaticResource ValLabel}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ── SETTINGS ──────────────────────────────────── -->
+            <TabItem Header="⚙  Настройки">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Background="{StaticResource BrBg}">
+                    <StackPanel Margin="32,20,32,20" MaxWidth="560">
+
+                        <Border Background="{StaticResource BrBg2}" CornerRadius="7" Padding="24,20">
+                            <StackPanel>
+
+                                <TextBlock Text="Backend URL" Style="{StaticResource SectionLabel}"/>
+                                <TextBox x:Name="CfgBackend" Style="{StaticResource DarkTextBox}"
+                                         Margin="0,0,0,14"/>
+
+                                <TextBlock Text="Server ID" Style="{StaticResource SectionLabel}"/>
+                                <TextBox x:Name="CfgServerId" Style="{StaticResource DarkTextBox}"
+                                         Margin="0,0,0,14"/>
+
+                                <TextBlock Text="Интервал (секунды)" Style="{StaticResource SectionLabel}"/>
+                                <TextBox x:Name="CfgInterval" Style="{StaticResource DarkTextBox}"
+                                         Margin="0,0,0,14"/>
+
+                                <TextBlock Text="Ingest API Key" Style="{StaticResource SectionLabel}"/>
+                                <TextBox x:Name="CfgApiKey" Style="{StaticResource DarkTextBox}"
+                                         Margin="0,0,0,24"/>
+
+                                <Button Content="💾   Сохранить и перезапустить"
+                                        Style="{StaticResource DarkButton}"
+                                        Background="{StaticResource BrAccent}"
+                                        Foreground="White"
+                                        Click="SaveSettings_Click"
+                                        HorizontalAlignment="Left"/>
+
+                                <TextBlock x:Name="SaveHint"
+                                           Text="Настройки записываются в agent.env"
+                                           FontSize="10" Foreground="{StaticResource BrFg2}"
+                                           Margin="0,12,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ── LOGS ──────────────────────────────────────── -->
+            <TabItem Header="📜  Логи агента">
+                <Grid Background="{StaticResource BrBg}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- log toolbar -->
+                    <Border Grid.Row="0" Background="{StaticResource BrBg}"
+                            Padding="12,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="🗑  Очистить" Style="{StaticResource DarkButton}"
+                                    Padding="12,5" FontSize="12"
+                                    Click="ClearLogs_Click"/>
+                            <CheckBox x:Name="AutoScroll" Content="Авто-прокрутка"
+                                      IsChecked="True" Margin="16,0,0,0"
+                                      Foreground="{StaticResource BrFg2}"
+                                      FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="LogCountLabel" Text=""
+                                       Margin="16,0,0,0"
+                                       Foreground="{StaticResource BrFg2}"
+                                       FontSize="11" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- log box -->
+                    <RichTextBox x:Name="LogBox" Grid.Row="1"
+                                 Background="#050D1A"
+                                 Foreground="{StaticResource BrFg}"
+                                 FontFamily="Consolas" FontSize="12"
+                                 IsReadOnly="True"
+                                 BorderThickness="0"
+                                 Margin="12,0,12,8"
+                                 VerticalScrollBarVisibility="Auto"
+                                 HorizontalScrollBarVisibility="Auto"
+                                 AcceptsReturn="True"/>
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+
+        <!-- ══════════════════════════════════════════════════════════
+             BOTTOM BAR
+        ══════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="2" Background="{StaticResource BrBg3}">
+            <Grid Margin="12,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="BtnStart" Content="▶  Запустить"
+                            Style="{StaticResource DarkButton}"
+                            Background="{StaticResource BrGreen}"
+                            Foreground="#07111E" FontWeight="SemiBold"
+                            Width="130" Margin="0,0,8,0"
+                            Click="StartAgent_Click"/>
+
+                    <Button x:Name="BtnStop" Content="■  Остановить"
+                            Style="{StaticResource DarkButton}"
+                            Background="{StaticResource BrRed}"
+                            Foreground="White" FontWeight="SemiBold"
+                            Width="130" IsEnabled="False"
+                            Click="StopAgent_Click"/>
+                </StackPanel>
+
+                <TextBlock x:Name="BottomInfo" Text=""
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Foreground="{StaticResource BrFg2}" FontSize="11"/>
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>

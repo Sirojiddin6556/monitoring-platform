@@ -1,6 +1,7 @@
 import {useEffect, useState, useMemo} from 'react'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
+import apiFetch from '../lib/api'
 
 function StatusBadge({status, colors: customColors}) {
   const defaultColors = {Running:'#4ade80', Succeeded:'#4ade80', Active:'#4ade80', Ready:'#4ade80', Pending:'#facc15', Failed:'#ef4444', Unknown:'#9aa4b2', NotReady:'#ef4444', Terminating:'#f97316'}
@@ -39,7 +40,7 @@ export default function Kubernetes() {
   const loadClusters = async () => {
     try {
       setError(null)
-      const {default: apiFetch} = await import('../lib/api')
+
       const d = await apiFetch('/api/kubernetes/clusters')
       setClusters(d.clusters || [])
     } catch(err) {
@@ -56,7 +57,7 @@ export default function Kubernetes() {
     if(!addForm.name.trim() || !addForm.api_url.trim()) { setAddError('Имя и API URL обязательны'); return }
     setAddLoading(true)
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       const res = await apiFetch('/api/kubernetes/clusters', {
         method: 'POST', body: JSON.stringify(addForm)
       })
@@ -70,7 +71,7 @@ export default function Kubernetes() {
   async function handleDelete(id) {
     if(!confirm('Удалить кластер?')) return
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch(`/api/kubernetes/clusters/${id}`, {method:'DELETE'})
       if(selected?.id === id) setSelected(null)
       await loadClusters()
@@ -79,7 +80,7 @@ export default function Kubernetes() {
 
   async function handleRefresh(id) {
     try {
-      const {default: apiFetch} = await import('../lib/api')
+
       await apiFetch(`/api/kubernetes/clusters/${id}/refresh`, {method:'POST'})
       await loadClusters()
     } catch(err) { setError('Ошибка обновления') }
@@ -124,7 +125,7 @@ export default function Kubernetes() {
   ]
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="admin">
       <div className="app-shell">
         <Sidebar />
         <div className="page" style={{maxWidth:'100%'}}>

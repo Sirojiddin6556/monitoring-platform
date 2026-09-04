@@ -301,17 +301,35 @@ def _winrm_collect_sync(host: str, user: str, password: str,
 
     scheme = 'https' if use_ssl else 'http'
     endpoint = f'{scheme}://{host}:{port}/wsman'
-    session = winrm.Session(
-        endpoint, auth=(user, password),
+
+    # Always ignore cert validation for monitoring (self-signed certs common)
+    # For HTTP transport, allow_unencrypted is required by pywinrm
+    session_kwargs = dict(
         transport='ntlm',
-        server_cert_validation='ignore' if use_ssl else 'validate',
+        server_cert_validation='ignore',
+        read_timeout_sec=25,
+        operation_timeout_sec=20,
     )
+    if not use_ssl:
+        session_kwargs['message_encryption'] = 'never'
+
+    session = winrm.Session(endpoint, auth=(user, password), **session_kwargs)
 
     ts = int(time.time())
 
     # PowerShell script to collect all metrics at once
+    # Force UTF-8 output to avoid encoding issues on non-English Windows
     ps_script = r"""
-$cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$ErrorActionPreference = 'SilentlyContinue'
+# CPU: use Get-Counter for accurate real-time CPU%
+try {
+    $cpuCounter = (Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 1).CounterSamples[0].CookedValue
+    $cpu = [math]::Round($cpuCounter, 1)
+} catch {
+    $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+    if ($cpu -eq $null) { $cpu = 0 }
+}
 $os = Get-CimInstance Win32_OperatingSystem
 $ramTotal = [math]::Round($os.TotalVisibleMemorySize / 1MB, 1)
 $ramFree = [math]::Round($os.FreePhysicalMemory / 1MB, 1)
@@ -372,10 +390,23 @@ Write-Output "===END==="
 
     try:
         result = session.run_ps(ps_script)
+        # Decode stdout — try UTF-8 first (we set console encoding in PS), fallback to cp1251
+        raw_out = result.std_out or b''
+        try:
+            output = raw_out.decode('utf-8-sig')  # utf-8-sig strips BOM if present
+        except UnicodeDecodeError:
+            output = raw_out.decode('cp1251', errors='replace')
+
         if result.status_code != 0:
-            stderr = result.std_err.decode('utf-8', errors='ignore') if result.std_err else ''
-            return _error_result(f"WinRM PS error: {stderr[:200]}")
-        output = result.std_out.decode('utf-8', errors='ignore')
+            raw_err = result.std_err or b''
+            try:
+                stderr = raw_err.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                stderr = raw_err.decode('cp1251', errors='replace')
+            # Some errors are non-fatal (e.g. Get-Counter access) — still try to parse output
+            if '===METRICS===' not in output:
+                return _error_result(f"WinRM PS error (code {result.status_code}): {stderr[:300]}")
+
         return _parse_winrm_output(output, ts)
     except Exception as e:
         return _error_result(f"WinRM exec error: {e}")

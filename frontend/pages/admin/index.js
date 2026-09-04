@@ -1,6 +1,7 @@
 import {useState, useEffect} from 'react'
 import Sidebar from '../../components/Sidebar'
 import ProtectedRoute from '../../components/ProtectedRoute'
+import apiFetch from '../../lib/api'
 
 function UserRow({user, onEdit, onDelete, onToggleActive}) {
   return (
@@ -62,6 +63,110 @@ function UserRow({user, onEdit, onDelete, onToggleActive}) {
   )
 }
 
+function CreateUserModal({onClose, onCreated}) {
+  const [formData, setFormData] = useState({username: '', email: '', password: '', role: 'viewer'})
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+    if(!formData.username.trim() || !formData.email.trim() || !formData.password.trim()) {
+      setError('Все поля обязательны')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+
+      const res = await apiFetch('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(formData)
+      })
+      if(res.detail) {
+        setError(res.detail)
+      } else if(res.id) {
+        onCreated(res)
+        onClose()
+      } else {
+        setError('Неизвестная ошибка')
+      }
+    } catch(err) {
+      setError('Ошибка: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: '#00000080', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+    }}>
+      <div style={{
+        background: '#0a1a2e', border: '1px solid #1a2940', borderRadius: 8,
+        padding: 24, maxWidth: 400, width: '100%'
+      }}>
+        <h2 style={{color: '#fff', marginBottom: 16}}>Создать пользователя</h2>
+        
+        {error && <div style={{color: '#ef4444', marginBottom: 12, fontSize: 13}}>{error}</div>}
+        
+        <form onSubmit={handleCreate}>
+          <div style={{marginBottom: 12}}>
+            <label style={{color: '#9aa4b2', fontSize: 12, display: 'block', marginBottom: 4}}>Имя пользователя *</label>
+            <input value={formData.username} onChange={e => setFormData({...formData, username: e.target.value})} required style={{
+              width: '100%', padding: '8px 10px', background: '#07111e', border: '1px solid #1a2940',
+              color: '#fff', borderRadius: 4, boxSizing: 'border-box', fontSize: 13
+            }} placeholder="username" />
+          </div>
+          
+          <div style={{marginBottom: 12}}>
+            <label style={{color: '#9aa4b2', fontSize: 12, display: 'block', marginBottom: 4}}>Email *</label>
+            <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required style={{
+              width: '100%', padding: '8px 10px', background: '#07111e', border: '1px solid #1a2940',
+              color: '#fff', borderRadius: 4, boxSizing: 'border-box', fontSize: 13
+            }} placeholder="user@example.com" />
+          </div>
+          
+          <div style={{marginBottom: 12}}>
+            <label style={{color: '#9aa4b2', fontSize: 12, display: 'block', marginBottom: 4}}>Пароль *</label>
+            <input type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} required minLength={8} style={{
+              width: '100%', padding: '8px 10px', background: '#07111e', border: '1px solid #1a2940',
+              color: '#fff', borderRadius: 4, boxSizing: 'border-box', fontSize: 13
+            }} placeholder="Минимум 8 символов" />
+          </div>
+          
+          <div style={{marginBottom: 16}}>
+            <label style={{color: '#9aa4b2', fontSize: 12, display: 'block', marginBottom: 4}}>Роль</label>
+            <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} style={{
+              width: '100%', padding: '8px 10px', background: '#07111e', border: '1px solid #1a2940',
+              color: '#fff', borderRadius: 4, boxSizing: 'border-box', fontSize: 13
+            }}>
+              <option value="viewer">Просмотр</option>
+              <option value="user">Пользователь</option>
+              <option value="admin">Администратор</option>
+            </select>
+          </div>
+          
+          <div style={{display: 'flex', gap: 8}}>
+            <button type="submit" disabled={loading} style={{
+              flex: 1, padding: '10px 16px', background: '#4ade80', color: '#000', border: 'none',
+              borderRadius: 4, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, fontSize: 13
+            }}>
+              {loading ? 'Создание...' : 'Создать'}
+            </button>
+            <button type="button" onClick={onClose} style={{
+              flex: 1, padding: '10px 16px', background: '#1a294060', color: '#fff', border: 'none',
+              borderRadius: 4, fontWeight: 600, cursor: 'pointer', fontSize: 13
+            }}>
+              Отмена
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function EditUserModal({user, onClose, onSave}) {
   const [formData, setFormData] = useState(user || {})
   const [loading, setLoading] = useState(false)
@@ -71,7 +176,7 @@ function EditUserModal({user, onClose, onSave}) {
     setLoading(true)
     setError(null)
     try {
-      const {default: apiFetch} = await import('../../lib/api')
+
       const res = await apiFetch(`/api/admin/users/${formData.id}`, {
         method: 'PUT',
         body: JSON.stringify(formData)
@@ -175,6 +280,7 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [editingUser, setEditingUser] = useState(null)
+  const [showCreateUser, setShowCreateUser] = useState(false)
 
   useEffect(() => {
     loadUsers()
@@ -184,7 +290,7 @@ export default function AdminPanel() {
     setLoading(true)
     setError(null)
     try {
-      const {default: apiFetch} = await import('../../lib/api')
+
       const res = await apiFetch('/api/admin/users')
       setUsers(res || [])
     } catch(err) {
@@ -197,7 +303,7 @@ export default function AdminPanel() {
   const handleDelete = async (userId) => {
     if(!confirm('Вы уверены?')) return
     try {
-      const {default: apiFetch} = await import('../../lib/api')
+
       await apiFetch(`/api/admin/users/${userId}`, {method: 'DELETE'})
       setUsers(users.filter(u => u.id !== userId))
     } catch(err) {
@@ -207,7 +313,7 @@ export default function AdminPanel() {
 
   const handleToggleActive = async (user) => {
     try {
-      const {default: apiFetch} = await import('../../lib/api')
+
       const res = await apiFetch(`/api/admin/users/${user.id}`, {
         method: 'PUT',
         body: JSON.stringify({is_active: !user.is_active})
@@ -247,7 +353,15 @@ export default function AdminPanel() {
           </div>
           
           <div className="card">
-            <h2 style={{padding: 16, borderBottom: '1px solid #1a2940', margin: 0, color: '#fff'}}>Управление пользователями</h2>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottom: '1px solid #1a2940'}}>
+              <h2 style={{margin: 0, color: '#fff'}}>Управление пользователями</h2>
+              <button onClick={() => setShowCreateUser(true)} style={{
+                padding: '8px 16px', background: '#4ade8040', color: '#4ade80',
+                border: '1px solid #4ade80', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer'
+              }}>
+                + Создать пользователя
+              </button>
+            </div>
             
             {loading && <div style={{padding: 16, textAlign: 'center', color: '#9aa4b2'}}>Загрузка...</div>}
             {error && <div style={{padding: 16, color: '#ef4444'}}>{error}</div>}
@@ -278,6 +392,7 @@ export default function AdminPanel() {
           </div>
           
           {editingUser && <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} onSave={handleSaveUser} />}
+          {showCreateUser && <CreateUserModal onClose={() => setShowCreateUser(false)} onCreated={(newUser) => { setUsers([...users, newUser]); loadUsers() }} />}
         </div>
       </div>
     </ProtectedRoute>

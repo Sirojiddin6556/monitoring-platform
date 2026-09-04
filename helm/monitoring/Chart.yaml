@@ -1,0 +1,21 @@
+apiVersion: v2
+name: monitoring
+description: Monitoring platform — FastAPI backend + Next.js frontend + Go agent
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - monitoring
+  - alerting
+  - infrastructure
+maintainers:
+  - name: platform-team
+dependencies:
+  - name: postgresql
+    version: "13.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled

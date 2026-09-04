@@ -1,0 +1,114 @@
+# Production Docker Compose Configuration
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=pg_stat_statements"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"  # Only expose if needed, consider removing
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monitoring
+
+  backend:
+    image: monitoring-backend:prod
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY}
+      INGEST_API_KEY: ${INGEST_API_KEY}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      ALLOW_INSECURE_TLS: "false"
+      ALLOW_LOCAL_INGEST_WITHOUT_KEY: "false"
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD}
+    ports:
+      - "9000:8000"  # Consider using reverse proxy instead
+    volumes:
+      - ../agent:/agent
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - monitoring
+    # Production: Add resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  frontend:
+    image: monitoring-frontend:prod
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    ports:
+      - "3000:3000"  # Consider using reverse proxy instead
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '500m'
+          memory: 512M
+
+volumes:
+  postgres_data_prod:
+    driver: local
+
+networks:
+  monitoring:
+    driver: bridge
+
+# PRODUCTION DEPLOYMENT NOTES:
+# 1. Use a reverse proxy (nginx, traefik, caddy) for:
+#    - HTTPS/TLS termination
+#    - Rate limiting
+#    - Security headers
+#    - Compression
+# 2. Update ALLOWED_ORIGINS to your production domain
+# 3. Generate strong random passwords for all services
+# 4. Use docker secrets or external secret management
+# 5. Set up monitoring and logging:
+#    - ELK Stack or Datadog
+#    - Prometheus + Grafana
+# 6. Configure automatic backups for PostgreSQL
+# 7. Set up CI/CD for automatic deployments
+# 8. Use version tags for images (not 'latest')

@@ -13,6 +13,11 @@ LOGSTASH_HOST = os.getenv('LOGSTASH_HOST', 'logstash')
 LOGSTASH_PORT = int(os.getenv('LOGSTASH_PORT', '5044'))
 TARGET = os.getenv('TARGET_URL', 'https://example.com')
 METRICS_PORT = int(os.getenv('METRICS_PORT', '8002'))
+INGEST_API_KEY = os.getenv('INGEST_API_KEY', '').strip()
+
+
+def _ingest_headers() -> dict:
+    return {'X-Ingest-Key': INGEST_API_KEY} if INGEST_API_KEY else {}
 
 # Prometheus metrics
 PROBES_TOTAL = Counter('prober_probes_total', 'Number of probes executed')
@@ -32,7 +37,7 @@ logger.setLevel(logging.INFO)
 def send_log_to_logstash(payload: dict):
     try:
         # POST to backend /api/logs
-        httpx.post(f"{BACKEND_URL}/api/logs", json=payload, timeout=5)
+        httpx.post(f"{BACKEND_URL}/api/logs", json=payload, timeout=5, headers=_ingest_headers())
         SENT_LOGS.inc()
     except Exception as e:
         logger.warning({'msg': 'failed to send log to backend', 'error': str(e)})
@@ -55,7 +60,7 @@ async def probe_once(session):
         logger.warning({'msg': 'probe_failed', 'error': str(e), 'target': TARGET})
         send_log_to_logstash({'level': 'warning', 'message': 'probe_failed', 'error': str(e), 'target': TARGET})
     try:
-        await session.post(f"{BACKEND_URL}/api/probe", json=result, timeout=5)
+        await session.post(f"{BACKEND_URL}/api/probe", json=result, timeout=5, headers=_ingest_headers())
         SENT_PROBES.inc()
     except Exception as e:
         logger.warning({'msg': 'failed to post probe', 'error': str(e)})

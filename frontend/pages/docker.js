@@ -1,6 +1,7 @@
 import {useEffect, useState, useMemo} from 'react'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
+import apiFetch from '../lib/api'
 
 function StatusBadge({status}) {
   const colors = {running:'#4ade80', exited:'#ef4444', paused:'#facc15', created:'#9aa4b2', restarting:'#f97316'}
@@ -35,7 +36,7 @@ export default function Docker() {
   const loadData = async () => {
     try {
       setError(null)
-      const {default: apiFetch} = await import('../lib/api')
+
       const [cRes, sRes] = await Promise.all([
         apiFetch('/api/docker/containers'),
         apiFetch('/api/docker/stats')
@@ -74,7 +75,7 @@ export default function Docker() {
   }, [containers, search, statusFilter, serverFilter])
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="admin">
       <div className="app-shell">
         <Sidebar />
         <div className="page" style={{maxWidth:'100%'}}>
