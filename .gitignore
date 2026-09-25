@@ -65,3 +65,9 @@ agent/monitoring-agent-linux-*
 agent/monitoring-agent-macos-*
 agent/monitoring-agent
 
+# Nested repos and agent runtime
+.claude/
+.claude-flow/
+minzdrav/
+Мозг/
+
