@@ -18,7 +18,8 @@ import {
   ShieldCheck, 
   AlertCircle,
   BarChart3,
-  Layers
+  Layers,
+  ChevronRight
 } from 'lucide-react'
 
 function parseNum(val) {
@@ -43,51 +44,52 @@ function StatusBadge({ status }) {
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
-      gap: 6,
-      padding: '3px 9px',
-      borderRadius: 12,
-      background: isUp ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-      border: `1px solid ${isUp ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+      gap: 5,
+      padding: '2px 7px',
+      borderRadius: 3,
+      background: isUp ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+      border: `1px solid ${isUp ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
     }}>
       <span style={{
-        width: 7,
-        height: 7,
+        width: 6,
+        height: 6,
         borderRadius: '50%',
-        background: isUp ? '#22c55e' : '#ef4444',
-        boxShadow: isUp ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+        background: isUp ? '#10b981' : '#ef4444',
       }}/>
       <span style={{
-        fontSize: 11,
-        color: isUp ? '#4ade80' : '#ef4444',
+        fontSize: 10.5,
+        color: isUp ? '#34d399' : '#f87171',
         fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
       }}>
-        {isUp ? 'Работает' : 'Остановлен'}
+        {isUp ? 'ACTIVE' : 'STOPPED'}
       </span>
     </span>
   )
 }
 
-function StatCard({ title, value, sub, icon: Icon, color = '#6366f1' }) {
+function StatCard({ title, value, sub, icon: Icon, color = '#2563eb' }) {
   return (
-    <div className="card" style={{ padding: '14px 16px', background: '#0a0d1f', border: '1px solid #1a1e38' }}>
+    <div className="card" style={{ padding: '14px 16px', background: '#101726', border: '1px solid #1e293b' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 11, color: '#8892a8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{title}</div>
-          <div style={{ fontSize: 24, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</div>
-          {sub && <div style={{ fontSize: 11, color: '#6272a4', marginTop: 4 }}>{sub}</div>}
+          <div style={{ fontSize: 10.5, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, fontWeight: 600 }}>{title}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>{value}</div>
+          {sub && <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>{sub}</div>}
         </div>
         <div style={{ 
-          width: 36, 
-          height: 36, 
-          borderRadius: 8, 
-          background: `${color}15`, 
-          border: `1px solid ${color}30`,
+          width: 32, 
+          height: 32, 
+          borderRadius: 4, 
+          background: '#162032', 
+          border: '1px solid #233148',
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          color 
+          color: '#94a3b8' 
         }}>
-          <Icon size={18} />
+          <Icon size={16} />
         </div>
       </div>
     </div>
@@ -103,7 +105,7 @@ function getDbType(image = '', name = '') {
   if (s.includes('mongo')) return { type: 'MongoDB', color: '#16a34a' }
   if (s.includes('clickhouse')) return { type: 'ClickHouse', color: '#eab308' }
   if (s.includes('elastic') || s.includes('opensearch')) return { type: 'Elasticsearch', color: '#06b6d4' }
-  return { type: 'База данных', color: '#6366f1' }
+  return { type: 'Database', color: '#64748b' }
 }
 
 function resolveServerInfo(c, serversList = []) {
@@ -121,7 +123,7 @@ function resolveServerInfo(c, serversList = []) {
   if (matched) {
     return { name: matched.name, host: matched.host, id: matched.id }
   }
-  return { name: sname || sid || 'Локальный хост', host: '—', id: sid }
+  return { name: sname || sid || 'Local host', host: '—', id: sid }
 }
 
 export default function Databases() {
@@ -166,7 +168,7 @@ export default function Databases() {
             memory_mb: parseNum(item.memory_mb),
             ports: item.port ? String(item.port) : '—',
             version: item.version,
-            source: item.source || 'Служба СУБД'
+            source: item.source || 'Engine'
           })
         }
       }
@@ -198,7 +200,7 @@ export default function Databases() {
                 memory_mb: parseNum(d.mem_mb ?? d.memory_mb),
                 ports: d.port ? String(d.port) : (typeInfo.type === 'PostgreSQL' ? '5432' : typeInfo.type === 'Redis' ? '6379' : '—'),
                 version: d.version || '—',
-                source: 'Системный сервис',
+                source: 'System service',
               })
             }
           }
@@ -230,7 +232,7 @@ export default function Databases() {
               memory_mb: parseNum(c.mem_mb ?? c.memory_usage_mb ?? c.mem),
               ports: c.ports || (typeInfo.type === 'PostgreSQL' ? '5432' : typeInfo.type === 'Redis' ? '6379' : '—'),
               image: img || 'docker',
-              source: 'Docker Контейнер',
+              source: 'Docker container',
             })
           }
         }
@@ -238,7 +240,7 @@ export default function Databases() {
 
       setDatabases(Array.from(dbMap.values()))
       if (isManual) {
-        toast.success("Данные телеметрии СУБД успешно обновлены")
+        toast.success("Телеметрия баз данных успешно обновлена")
       }
     } catch(e) {
       console.error('Error loading databases:', e)
@@ -282,132 +284,97 @@ export default function Databases() {
     <ProtectedRoute>
       <div className="app-shell">
         <Sidebar />
-        <div className="page" style={{ maxWidth: '100%', padding: '24px 30px' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div className="page">
+          {/* Strict Enterprise Breadcrumb Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#e2e4f0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Database size={22} style={{ color: '#6366f1' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+                <span>ИНФРАСТРУКТУРА</span>
+                <ChevronRight size={10} />
+                <span style={{ color: '#94a3b8' }}>СУБД И ХРАНИЛИЩА</span>
+              </div>
+              <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#f1f5f9' }}>
                 Базы данных и СУБД
               </h1>
-              <div style={{ fontSize: 12, color: '#8892a8', marginTop: 4 }}>
-                Глубокий мониторинг PostgreSQL, кэша Redis, бэкапов и СУБД по всей инфраструктуре
-              </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <Link href="/executive" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 14px',
-                borderRadius: 6,
-                background: 'rgba(99,102,241,0.12)',
-                border: '1px solid rgba(99,102,241,0.25)',
-                color: '#a5b4fc',
-                textDecoration: 'none',
-                fontSize: 12,
-                fontWeight: 600,
-              }}>
-                <BarChart3 size={14} />
+              <Link href="/executive" className="btn">
+                <BarChart3 size={13} style={{ color: '#3b82f6' }} />
                 <span>Ситуационный Центр</span>
               </Link>
-              <button
-                onClick={() => loadData(true)}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '6px 14px',
-                  borderRadius: 6,
-                  background: '#0d0d24',
-                  border: '1px solid #1c1c3e',
-                  color: '#d6deea',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  transition: 'background 0.15s',
-                }}
-              >
-                <RefreshCw size={13} className={loading ? 'spin' : ''} />
+              <button onClick={() => loadData(true)} className="btn">
+                <RefreshCw size={12} className={loading ? 'spin' : ''} />
                 <span>Обновить</span>
               </button>
             </div>
           </div>
 
-          {/* Top KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
-            <StatCard title="Всего СУБД" value={totalDbs} sub="Экземпляров в системе" icon={Database} color="#6366f1" />
-            <StatCard title="Активных" value={runningDbs} sub={`${runningDbs} из ${totalDbs} работают`} icon={CheckCircle2} color="#22c55e" />
+          {/* Top KPI Cards (Strict Clean Tiles) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 16 }}>
+            <StatCard title="Экземпляры СУБД" value={totalDbs} sub="Всего обнаружено" icon={Database} />
+            <StatCard title="Активные службы" value={runningDbs} sub={`${runningDbs} из ${totalDbs} в сети`} icon={CheckCircle2} />
             <StatCard
-              title="PostgreSQL"
-              value={pgSummary?.databases?.[0]?.size_pretty || `${pgDbs} кластера`}
-              sub={pgSummary ? `Соединений: ${pgSummary.active_connections} / ${pgSummary.max_connections}` : 'Реляционные БД'}
+              title="PostgreSQL размер"
+              value={pgSummary?.databases?.[0]?.size_pretty || `${pgDbs} узла`}
+              sub={pgSummary ? `Соединения: ${pgSummary.active_connections} / ${pgSummary.max_connections}` : 'Основная СУБД'}
               icon={HardDrive}
-              color="#38bdf8"
             />
             <StatCard
-              title="Redis In-Memory"
-              value={redisSummary?.used_memory_human || `${redisDbs} ноды`}
-              sub={redisSummary ? `${redisSummary.connected_clients} клиентов • Порт 6379` : 'Кэш и брокер'}
+              title="Redis память"
+              value={redisSummary?.used_memory_human || `${redisDbs} узла`}
+              sub={redisSummary ? `${redisSummary.connected_clients} активных сессий` : 'Кэш и очереди'}
               icon={Zap}
-              color="#fb7185"
             />
           </div>
 
-          {/* DEEP TELEMETRY & GAUGES */}
+          {/* DEEP TELEMETRY CARDS (Solid Slate Enterprise Cards) */}
           {telemetry && (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
-              gap: 16,
-              marginBottom: 24,
+              gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+              gap: 12,
+              marginBottom: 18,
             }}>
-              {/* Card 1: PostgreSQL Deep Engine Stats */}
-              <div className="card" style={{ padding: '20px 22px', background: 'linear-gradient(180deg, #0b1120 0%, #070a14 100%)', border: '1px solid #1e293b' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                      <Database size={18} />
-                    </div>
+              {/* Card 1: PostgreSQL Engine */}
+              <div className="card" style={{ padding: '16px 18px', background: '#101726', border: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Database size={15} style={{ color: '#38bdf8' }} />
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>PostgreSQL 15 Cluster</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>192.168.17.50:5432 • Главная СУБД платформы</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f1f5f9' }}>PostgreSQL 15 Cluster</div>
+                      <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono)' }}>192.168.17.50:5432</div>
                     </div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
-                    ONLINE
-                  </span>
+                  <span className="badge badge-success">ONLINE</span>
                 </div>
 
                 {pgSummary && (
                   <div>
-                    {/* Gauges row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '12px 0 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #162032' }}>
                       <GaugeChart 
                         value={pgSummary.total_connections} 
                         max={pgSummary.max_connections} 
-                        size={120} 
-                        strokeWidth={10} 
-                        label="Нагрузка" 
-                        sublabel={`${pgSummary.total_connections}/${pgSummary.max_connections} conns`} 
+                        size={110} 
+                        strokeWidth={8} 
+                        label="Соединения" 
+                        sublabel={`${pgSummary.total_connections}/${pgSummary.max_connections}`} 
                       />
                       <GaugeChart 
                         value={pgSummary.cache_hit_ratio} 
                         max={100} 
-                        size={120} 
-                        strokeWidth={10} 
+                        size={110} 
+                        strokeWidth={8} 
                         label="Cache Hit" 
-                        color="#22c55e" 
+                        color="#10b981" 
                         unit="%" 
                       />
                     </div>
 
-                    {/* DB Sizes Pill */}
-                    <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
                       {pgSummary.databases?.map((d, idx) => (
-                        <div key={idx} style={{ background: '#111827', border: '1px solid #1f2937', padding: '6px 12px', borderRadius: 6, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ color: '#94a3b8' }}>БД {d.datname}:</span>
-                          <span style={{ color: '#38bdf8', fontWeight: 700 }}>{d.size_pretty}</span>
+                        <div key={idx} style={{ background: '#0a0f1a', border: '1px solid #1e293b', padding: '4px 9px', borderRadius: 4, fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: '#64748b' }}>{d.datname}:</span>
+                          <span style={{ color: '#e2e8f0', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{d.size_pretty}</span>
                         </div>
                       ))}
                     </div>
@@ -415,86 +382,72 @@ export default function Databases() {
                 )}
               </div>
 
-              {/* Card 2: Redis In-Memory Engine */}
-              <div className="card" style={{ padding: '20px 22px', background: 'linear-gradient(180deg, #190e1c 0%, #0c060e 100%)', border: '1px solid #371828' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(251, 113, 133, 0.12)', border: '1px solid rgba(251, 113, 133, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fb7185' }}>
-                      <Zap size={18} />
-                    </div>
+              {/* Card 2: Redis Engine */}
+              <div className="card" style={{ padding: '16px 18px', background: '#101726', border: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Zap size={15} style={{ color: '#fb7185' }} />
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>Redis 7.4 In-Memory</div>
-                      <div style={{ fontSize: 11, color: '#a1a1aa' }}>192.168.17.50:6379 • Доступен по сети</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f1f5f9' }}>Redis 7.4 In-Memory</div>
+                      <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono)' }}>192.168.17.50:6379</div>
                     </div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
-                    ONLINE
-                  </span>
+                  <span className="badge badge-success">ONLINE</span>
                 </div>
 
                 {redisSummary && (
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '12px 0 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #162032' }}>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>Использование RAM</div>
-                        <div style={{ fontSize: 24, fontWeight: 800, color: '#fb7185' }}>{redisSummary.used_memory_human}</div>
-                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Пик: {redisSummary.used_memory_peak_human}</div>
+                        <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 3 }}>RAM Память</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{redisSummary.used_memory_human}</div>
+                        <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>Пик: {redisSummary.used_memory_peak_human}</div>
                       </div>
                       <GaugeChart 
                         value={redisSummary.connected_clients} 
                         max={100} 
-                        size={120} 
-                        strokeWidth={10} 
+                        size={110} 
+                        strokeWidth={8} 
                         label="Клиенты" 
                         color="#38bdf8" 
                         unit="" 
                       />
                     </div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Activity size={13} style={{ color: '#fb7185' }} />
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Activity size={12} style={{ color: '#3b82f6' }} />
                       <span>{redisSummary.role || 'Кэш сессий & Брокер Celery'}</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* Card 3: Automated Backups & Disaster Recovery */}
-              <div className="card" style={{ padding: '20px 22px', background: 'linear-gradient(180deg, #0d1a16 0%, #060e0c 100%)', border: '1px solid #143828' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4ade80' }}>
-                      <Archive size={18} />
-                    </div>
+              {/* Card 3: Backups */}
+              <div className="card" style={{ padding: '16px 18px', background: '#101726', border: '1px solid #1e293b' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Archive size={15} style={{ color: '#10b981' }} />
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: '#f1f5f9' }}>Резервные копии (Бэкапы)</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>pg_dump | gzip -9 • Cron 03:00</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f1f5f9' }}>Резервное копирование</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>pg_dump • Daily snapshot</div>
                     </div>
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
-                    АКТИВЕН
-                  </span>
+                  <span className="badge badge-success">SCHEDULED</span>
                 </div>
 
                 {backupSummary && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ background: '#0a0f1a', padding: '9px 12px', borderRadius: 4, border: '1px solid #1e293b' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Свежий дамп:</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#4ade80' }}>{backupSummary.size_mb ? `${backupSummary.size_mb} MB` : 'Готов'}</span>
+                        <span style={{ fontSize: 11.5, color: '#94a3b8' }}>Свежий архив:</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>{backupSummary.size_mb ? `${backupSummary.size_mb} MB` : 'Готов'}</span>
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 3, fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {backupSummary.latest_file || 'monitoring_daily.sql.gz'}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#8892a8', padding: '0 4px' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Clock size={12} style={{ color: '#6366f1' }} />
-                        03:00 Ежедневно
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <ShieldCheck size={12} style={{ color: '#22c55e' }} />
-                        Хранение 14 дней
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b' }}>
+                      <span>Расписание: 03:00 UTC</span>
+                      <span>Срок хранения: 14 суток</span>
                     </div>
                   </div>
                 )}
@@ -502,41 +455,32 @@ export default function Databases() {
             </div>
           )}
 
-          {/* Controls: Search & Type filters */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ flex: 1, minWidth: 260 }}>
+          {/* Controls: Search & Filters */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
               <input
+                className="input"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Поиск по имени, хосту, типу, контейнеру..."
-                style={{
-                  width: '100%',
-                  padding: '8px 14px',
-                  background: '#07071a',
-                  border: '1px solid #1c1c3e',
-                  borderRadius: 6,
-                  color: '#e2e4f0',
-                  fontSize: 13,
-                  outline: 'none',
-                }}
+                placeholder="Поиск по имени, хосту, типу..."
               />
             </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
               {availableTypes.map(t => (
                 <button
                   key={t}
                   onClick={() => setTypeFilter(t)}
                   style={{
-                    padding: '5px 12px',
-                    borderRadius: 6,
-                    fontSize: 12,
+                    padding: '5px 10px',
+                    borderRadius: 4,
+                    fontSize: 11.5,
                     fontWeight: 600,
                     cursor: 'pointer',
-                    background: typeFilter === t ? '#6366f1' : '#07071a',
-                    color: typeFilter === t ? '#fff' : '#8892a8',
+                    background: typeFilter === t ? '#2563eb' : '#101726',
+                    color: typeFilter === t ? '#fff' : '#94a3b8',
                     border: '1px solid',
-                    borderColor: typeFilter === t ? '#6366f1' : '#1c1c3e',
-                    transition: 'all 0.15s',
+                    borderColor: typeFilter === t ? '#1d4ed8' : '#1e293b',
+                    transition: 'all 0.1s',
                   }}
                 >
                   {t === 'all' ? 'Все СУБД' : t}
@@ -545,77 +489,58 @@ export default function Databases() {
             </div>
           </div>
 
-          {/* Databases Table */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden', background: '#07071a', border: '1px solid #1c1c3e' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+          {/* Clean Classical Table */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <table className="table">
               <thead>
-                <tr style={{ borderBottom: '1px solid #1c1c3e', color: '#6272a4', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, background: 'rgba(255,255,255,0.01)' }}>
-                  <th style={{ padding: '12px 16px' }}>Экземпляр / База</th>
-                  <th style={{ padding: '12px 16px' }}>Тип</th>
-                  <th style={{ padding: '12px 16px' }}>Сервер / Хост</th>
-                  <th style={{ padding: '12px 16px' }}>Порт</th>
-                  <th style={{ padding: '12px 16px' }}>Статус</th>
-                  <th style={{ padding: '12px 16px' }}>Размер / Память</th>
-                  <th style={{ padding: '12px 16px' }}>Источник</th>
+                <tr>
+                  <th>Экземпляр / Имя</th>
+                  <th>Тип</th>
+                  <th>Сервер / Хост</th>
+                  <th>Порт</th>
+                  <th>Статус</th>
+                  <th>Объём / Память</th>
+                  <th>Источник</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && databases.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#6272a4' }}>
-                      Загрузка телеметрии баз данных...
+                    <td colSpan={7} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                      Загрузка реестра СУБД...
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: '#6272a4' }}>
-                      Баз данных не найдено
+                    <td colSpan={7} style={{ padding: 28, textAlign: 'center', color: '#64748b' }}>
+                      Экземпляров не найдено
                     </td>
                   </tr>
                 ) : (
                   filtered.map((d, i) => (
-                    <tr 
-                      key={d.id || i}
-                      style={{ 
-                        borderBottom: '1px solid #121228',
-                        transition: 'background 0.1s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color || '#6366f1' }} />
-                          <span style={{ fontWeight: 600, color: '#e2e4f0' }}>{d.name}</span>
-                        </div>
+                    <tr key={d.id || i}>
+                      <td>
+                        <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{d.name}</span>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: 4,
-                          background: `${d.color || '#6366f1'}15`,
-                          color: d.color || '#6366f1',
-                          border: `1px solid ${d.color || '#6366f1'}30`,
-                        }}>
+                      <td>
+                        <span className="badge badge-accent">
                           {d.type}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#c4cfe0' }}>
-                        <div>{d.serverName}</div>
-                        <div style={{ fontSize: 11, color: '#6272a4' }}>{d.serverHost}</div>
+                      <td>
+                        <div style={{ color: '#cbd5e1' }}>{d.serverName}</div>
+                        <div style={{ fontSize: 10.5, color: '#64748b', fontFamily: 'var(--font-mono)' }}>{d.serverHost}</div>
                       </td>
-                      <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#818cf8' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#93c5fd' }}>
                         {d.ports}
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td>
                         <StatusBadge status={d.status} />
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#e2e4f0' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#f1f5f9' }}>
                         {d.size_pretty || d.memory_used || (d.memory_mb ? `${d.memory_mb} MB` : '—')}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#6272a4', fontSize: 12 }}>
+                      <td style={{ color: '#64748b', fontSize: 11.5 }}>
                         {d.source}
                       </td>
                     </tr>

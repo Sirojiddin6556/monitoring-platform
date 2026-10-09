@@ -17,7 +17,8 @@ import {
   LogOut, 
   ChevronDown, 
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Layers
 } from 'lucide-react'
 import { isSoundEnabled, setSoundEnabled, playAlertSound } from './SoundAlert'
 
@@ -38,20 +39,20 @@ const NAV = [
   {
     id: 'home',
     icon: <LayoutDashboard size={15} />,
-    label: 'Главная',
+    label: 'Обзор системы',
     href: '/',
   },
   {
     id: 'resources',
     icon: <Server size={15} />,
-    label: 'Ресурсы',
+    label: 'Инфраструктура',
     items: [
       { label: 'Серверы',               href: '/servers' },
       { label: 'Веб-сайты',             href: '/websites' },
-      { label: 'API',                   href: '/api-monitoring', adminOnly: true },
+      { label: 'API сервисы',           href: '/api-monitoring', adminOnly: true },
       {
         id: 'containers',
-        label: 'Контейнеры',
+        label: 'Контейнеризация',
         adminOnly: true,
         items: [
           { label: 'Docker',            href: '/docker' },
@@ -67,51 +68,51 @@ const NAV = [
   {
     id: 'events',
     icon: <AlertTriangle size={15} />,
-    label: 'События',
+    label: 'Мониторинг событий',
     items: [
       { label: 'Алерты',     href: '/alerts' },
       { label: 'Инциденты',  href: '/incidents' },
-      { label: 'Логи',       href: '/logs', adminOnly: true },
+      { label: 'Журнал логов', href: '/logs', adminOnly: true },
     ],
   },
   {
     id: 'analytics',
     icon: <LineChart size={15} />,
-    label: 'Аналитика',
+    label: 'Аналитика и отчёты',
     items: [
       { label: 'Дашборды', href: '/dashboards' },
       { label: 'Grafana',   href: 'http://192.168.17.50:3001', external: true },
-      { label: 'Отчёты',   href: '/reports' },
+      { label: 'Сводные отчёты', href: '/reports' },
     ],
   },
   {
     id: 'notifications',
     icon: <Bell size={15} />,
-    label: 'Уведомления',
+    label: 'Оповещения',
     adminOnly: true,
     items: [
-      { label: 'Telegram',        href: '/telegram' },
+      { label: 'Telegram бот',    href: '/telegram' },
       { label: 'Email & Webhook', href: '/notifications' },
-      { label: 'SMS',             soon: true },
+      { label: 'SMS шлюз',        soon: true },
     ],
   },
   {
     id: 'system',
     icon: <Settings size={15} />,
-    label: 'Система',
+    label: 'Конфигурация',
     items: [
-      { label: 'Обслуживание', href: '/maintenance' },
-      { label: 'Настройки',    href: '/settings', adminOnly: true },
+      { label: 'Регламентные работы', href: '/maintenance' },
+      { label: 'Параметры системы',  href: '/settings', adminOnly: true },
     ],
   },
   {
     id: 'admin',
     icon: <Shield size={15} />,
-    label: 'Администрирование',
+    label: 'Управление доступом',
     adminOnly: true,
     items: [
-      { label: 'Организации',  href: '/organizations' },
-      { label: 'Пользователи', href: '/admin' },
+      { label: 'Организации',   href: '/organizations' },
+      { label: 'Учётные записи', href: '/admin' },
     ],
   },
 ]
@@ -149,18 +150,17 @@ function NavLeaf({ label, href, depth, pathname, external }) {
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          padding: `5px 10px 5px ${12 + depth * 14}px`,
-          color: hover ? '#c4cfe0' : '#6272a4',
-          background: hover ? 'rgba(255,255,255,0.04)' : 'none',
-          fontSize: 12.5,
+          padding: `5px 12px 5px ${14 + depth * 12}px`,
+          color: hover ? '#f1f5f9' : '#8896ab',
+          background: hover ? 'rgba(255,255,255,0.03)' : 'none',
+          fontSize: 12,
           textDecoration: 'none',
-          borderRadius: '0 6px 6px 0',
-          transition: 'color 0.12s, background 0.12s',
-          lineHeight: 1.5,
+          transition: 'color 0.1s',
+          lineHeight: 1.4,
         }}
       >
         <span style={{ flex: 1 }}>{label}</span>
-        <ExternalLink size={11} style={{ opacity: 0.6 }} />
+        <ExternalLink size={10} style={{ opacity: 0.5 }} />
       </a>
     )
   }
@@ -173,15 +173,15 @@ function NavLeaf({ label, href, depth, pathname, external }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        padding: `5px 10px 5px ${12 + depth * 14}px`,
-        color: active ? '#a5b4fc' : hover ? '#c4cfe0' : '#6272a4',
-        background: active ? 'rgba(99,102,241,0.12)' : hover ? 'rgba(255,255,255,0.04)' : 'none',
-        borderLeft: `2px solid ${active ? '#6366f1' : 'transparent'}`,
-        fontSize: 12.5,
+        padding: `5px 12px 5px ${14 + depth * 12}px`,
+        color: active ? '#60a5fa' : hover ? '#f1f5f9' : '#8896ab',
+        background: active ? 'rgba(37,99,235,0.08)' : hover ? 'rgba(255,255,255,0.03)' : 'none',
+        borderLeft: `2px solid ${active ? '#2563eb' : 'transparent'}`,
+        fontSize: 12,
+        fontWeight: active ? 600 : 400,
         textDecoration: 'none',
-        borderRadius: '0 6px 6px 0',
-        transition: 'color 0.12s, background 0.12s',
-        lineHeight: 1.5,
+        transition: 'all 0.1s',
+        lineHeight: 1.4,
       }}
     >
       {label}
@@ -194,19 +194,19 @@ function NavSoon({ label, depth }) {
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      padding: `5px 10px 5px ${12 + depth * 14}px`,
-      color: '#2e3558',
-      fontSize: 12.5,
-      lineHeight: 1.5,
+      padding: `5px 12px 5px ${14 + depth * 12}px`,
+      color: '#475569',
+      fontSize: 12,
+      lineHeight: 1.4,
       userSelect: 'none',
     }}>
       <span style={{ flex: 1 }}>{label}</span>
       <span style={{
         fontSize: 9,
-        color: '#3a4070',
-        background: '#0d0d24',
-        border: '1px solid #1c1c3e',
-        padding: '1px 5px',
+        color: '#64748b',
+        background: '#0d131f',
+        border: '1px solid #1e293b',
+        padding: '1px 4px',
         borderRadius: 3,
         letterSpacing: 0.3,
       }}>Скоро</span>
@@ -230,24 +230,24 @@ function NavSubGroup({ item, depth, pathname, open, toggle }) {
           alignItems: 'center',
           gap: 6,
           width: '100%',
-          padding: `5px 10px 5px ${12 + depth * 14}px`,
-          background: hover ? 'rgba(255,255,255,0.04)' : 'none',
+          padding: `5px 12px 5px ${14 + depth * 12}px`,
+          background: hover ? 'rgba(255,255,255,0.03)' : 'none',
           border: 'none',
           borderLeft: '2px solid transparent',
           cursor: 'pointer',
-          color: active ? '#a5b4fc' : hover ? '#8892a8' : '#4a5078',
-          fontSize: 12.5,
+          color: active ? '#93c5fd' : hover ? '#cbd5e1' : '#64748b',
+          fontSize: 12,
+          fontWeight: 500,
           textAlign: 'left',
-          borderRadius: '0 6px 6px 0',
-          transition: 'color 0.12s, background 0.12s',
+          transition: 'color 0.1s',
           fontFamily: 'inherit',
-          lineHeight: 1.5,
+          lineHeight: 1.4,
         }}
       >
         <span style={{ flex: 1 }}>{item.label}</span>
-        <ChevronRight size={12} style={{
-          color: '#3a4070',
-          transition: 'transform 0.18s',
+        <ChevronRight size={11} style={{
+          color: '#475569',
+          transition: 'transform 0.15s',
           transform: isOpen ? 'rotate(90deg)' : 'none',
         }} />
       </button>
@@ -283,32 +283,31 @@ function TopLevelLink({ icon, label, href, badge, pathname }) {
         display: 'flex',
         alignItems: 'center',
         gap: 9,
-        padding: '7px 10px',
-        color: active ? '#a5b4fc' : hover ? '#c4cfe0' : '#8892a8',
-        background: active ? 'rgba(99,102,241,0.12)' : hover ? 'rgba(255,255,255,0.04)' : 'none',
-        borderLeft: `2px solid ${active ? '#6366f1' : 'transparent'}`,
-        fontSize: 13,
-        fontWeight: 600,
+        padding: '6px 12px',
+        color: active ? '#60a5fa' : hover ? '#f1f5f9' : '#94a3b8',
+        background: active ? 'rgba(37,99,235,0.09)' : hover ? 'rgba(255,255,255,0.03)' : 'none',
+        borderLeft: `3px solid ${active ? '#2563eb' : 'transparent'}`,
+        fontSize: 12.5,
+        fontWeight: active ? 600 : 500,
         textDecoration: 'none',
-        borderRadius: '0 7px 7px 0',
-        transition: 'color 0.12s, background 0.12s',
+        transition: 'all 0.1s',
         marginBottom: 1,
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', opacity: active ? 1 : 0.8, color: active ? '#818cf8' : 'inherit' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', color: active ? '#3b82f6' : '#64748b' }}>
         {icon}
       </span>
       <span style={{ flex: 1 }}>{label}</span>
       {badge && (
         <span style={{
           fontSize: 9,
-          fontWeight: 800,
-          background: 'linear-gradient(135deg, #6366f1, #38bdf8)',
-          color: '#ffffff',
+          fontWeight: 700,
+          background: '#162238',
+          border: '1px solid #1e3a5f',
+          color: '#38bdf8',
           padding: '1px 5px',
-          borderRadius: 4,
+          borderRadius: 3,
           letterSpacing: 0.5,
-          boxShadow: '0 0 8px rgba(99,102,241,0.5)',
         }}>
           {badge}
         </span>
@@ -327,31 +326,30 @@ function SectionHeader({ icon, label, isOpen, active, onClick }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 9,
+        gap: 8,
         width: '100%',
-        padding: '7px 10px',
-        background: hover ? 'rgba(255,255,255,0.04)' : 'none',
+        padding: '6px 12px',
+        background: hover ? 'rgba(255,255,255,0.02)' : 'none',
         border: 'none',
-        borderLeft: '2px solid transparent',
+        borderLeft: '3px solid transparent',
         cursor: 'pointer',
-        color: active ? '#a5b4fc' : hover ? '#8892a8' : '#6272a4',
-        fontSize: 12,
-        fontWeight: 700,
+        color: active ? '#93c5fd' : hover ? '#cbd5e1' : '#64748b',
+        fontSize: 11,
+        fontWeight: 600,
         textAlign: 'left',
-        borderRadius: '0 7px 7px 0',
         marginBottom: 1,
         fontFamily: 'inherit',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: '0.06em',
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', opacity: active ? 1 : 0.7, color: active ? '#818cf8' : 'inherit' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', color: active ? '#3b82f6' : '#475569' }}>
         {icon}
       </span>
       <span style={{ flex: 1 }}>{label}</span>
-      <ChevronDown size={13} style={{
-        color: '#4a5078',
-        transition: 'transform 0.18s',
+      <ChevronDown size={12} style={{
+        color: '#475569',
+        transition: 'transform 0.15s',
         transform: isOpen ? 'none' : 'rotate(-90deg)',
       }} />
     </button>
@@ -365,7 +363,6 @@ export default function Sidebar() {
   const [user, setUser] = useState(null)
   const [soundEnabled, setSoundState] = useState(true)
   const [open, setOpen] = useState({})
-  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -423,7 +420,7 @@ export default function Sidebar() {
     const isOpen = open[sec.id] !== undefined ? open[sec.id] : hasActiveChild
 
     return (
-      <div key={sec.id} style={{ marginBottom: 2 }}>
+      <div key={sec.id} style={{ marginBottom: 3 }}>
         <SectionHeader
           icon={sec.icon}
           label={sec.label}
@@ -432,7 +429,7 @@ export default function Sidebar() {
           onClick={() => toggleSection(sec.id)}
         />
         {isOpen && (
-          <div style={{ paddingBottom: 4 }}>
+          <div style={{ paddingBottom: 2 }}>
             {sec.items.map(it => {
               if (it.adminOnly && !isAdmin) return null
               if (it.items) {
@@ -468,244 +465,209 @@ export default function Sidebar() {
   }
 
   return (
-    <>
-      {/* Mobile top navbar button */}
+    <div style={{
+      width: 220,
+      height: '100vh',
+      background: '#0a0e17',
+      borderRight: '1px solid #1a2436',
+      display: 'flex',
+      flexDirection: 'column',
+      flexShrink: 0,
+      position: 'sticky',
+      top: 0,
+      userSelect: 'none',
+      zIndex: 50,
+    }}>
+      {/* Strict Corporate Header */}
       <div style={{
-        display: 'none',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 50,
-        background: '#07071a',
-        borderBottom: '1px solid #1c1c3e',
-        zIndex: 999,
-        padding: '0 16px',
+        padding: '14px 14px 12px',
+        borderBottom: '1px solid #162032',
+        display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
-      }} className="mobile-header">
-        <div style={{ fontWeight: 800, color: '#e2e4f0', fontSize: 15 }}>
-          <span style={{ color: '#6366f1' }}>⚡</span> MONITORING
+        gap: 9,
+      }}>
+        <div style={{
+          width: 28,
+          height: 28,
+          borderRadius: 4,
+          background: '#121b2d',
+          border: '1px solid #1e293b',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#3b82f6',
+        }}>
+          <Layers size={16} />
         </div>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '0.04em' }}>
+            MONITORING
+          </div>
+          <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Operations Console
+          </div>
+        </div>
+      </div>
+
+      {/* Global Quick Search Pill (Ctrl+K) */}
+      <div style={{ padding: '8px 10px 4px' }}>
         <button
-          onClick={() => setSidebarOpen(prev => !prev)}
+          onClick={() => {
+            const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+            window.dispatchEvent(event)
+          }}
           style={{
-            background: 'none',
-            border: 'none',
-            color: '#8892a8',
-            fontSize: 20,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '5px 9px',
+            background: '#0d131f',
+            border: '1px solid #1e293b',
+            borderRadius: 4,
+            color: '#64748b',
+            fontSize: 11.5,
             cursor: 'pointer',
-            padding: 4,
+            fontFamily: 'inherit',
           }}
         >
-          ☰
+          <Search size={12} style={{ color: '#3b82f6' }} />
+          <span style={{ flex: 1, textAlign: 'left' }}>Поиск...</span>
+          <kbd style={{
+            fontSize: 9,
+            background: '#141d2d',
+            color: '#94a3b8',
+            padding: '1px 4px',
+            borderRadius: 3,
+            border: '1px solid #1e293b',
+            fontFamily: 'var(--font-mono)',
+          }}>Ctrl K</kbd>
         </button>
       </div>
 
+      {/* Nav Links */}
       <div style={{
-        width: 220,
-        height: '100vh',
-        background: '#07071a',
-        borderRight: '1px solid #1c1c3e',
-        display: 'flex',
-        flexDirection: 'column',
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        userSelect: 'none',
-        zIndex: 50,
+        flex: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: '6px 0 10px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#1e293b transparent',
       }}>
-        {/* Brand Header */}
-        <div style={{
-          padding: '16px 14px 12px',
-          borderBottom: '1px solid #121228',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
-          <div style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg, #6366f1, #38bdf8)',
+        {NAV.map(section => renderSection(section))}
+      </div>
+
+      {/* Footer: Audio toggle & User profile */}
+      <div style={{
+        padding: '8px 12px 12px',
+        borderTop: '1px solid #162032',
+        background: '#080c14',
+        flexShrink: 0,
+      }}>
+        {/* Sound toggle button */}
+        <button
+          onClick={toggleSound}
+          style={{
+            width: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 12px rgba(99,102,241,0.4)',
+            justifyContent: 'space-between',
+            padding: '4px 8px',
+            background: soundEnabled ? 'rgba(16, 185, 129, 0.08)' : '#0d131f',
+            border: `1px solid ${soundEnabled ? 'rgba(16, 185, 129, 0.25)' : '#1e293b'}`,
+            borderRadius: 4,
+            marginBottom: 8,
+            cursor: 'pointer',
+            fontSize: 11,
+            color: soundEnabled ? '#34d399' : '#64748b',
+            fontFamily: 'inherit',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {soundEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+            {soundEnabled ? 'Алерты со звуком' : 'Звук отключен'}
+          </span>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 700,
+            padding: '1px 4px',
+            borderRadius: 2,
+            background: soundEnabled ? '#10b981' : '#334155',
             color: '#fff',
-            fontWeight: 900,
-            fontSize: 16,
           }}>
-            ⚡
-          </div>
-          <div>
-            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#e2e4f0', letterSpacing: 0.3 }}>
-              MONITORING
-            </div>
-            <div style={{ fontSize: 10, color: '#4a5078', fontWeight: 600 }}>
-              PLATFORM PRO
-            </div>
-          </div>
-        </div>
+            {soundEnabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
 
-        {/* Global Quick Search Pill (Ctrl+K) */}
-        <div style={{ padding: '8px 10px 4px' }}>
-          <button
-            onClick={() => {
-              const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
-              window.dispatchEvent(event)
-            }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 10px',
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid #1a1a36',
-              borderRadius: 6,
-              color: '#6272a4',
-              fontSize: 11.5,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              transition: 'border-color 0.15s',
-            }}
-          >
-            <Search size={13} style={{ color: '#6366f1' }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>Быстрый поиск</span>
-            <kbd style={{
-              fontSize: 9,
-              background: '#121228',
-              color: '#818cf8',
-              padding: '1px 5px',
-              borderRadius: 3,
-              border: '1px solid #1c1c3e',
-              fontWeight: 700,
-            }}>Ctrl K</kbd>
-          </button>
-        </div>
-
-        {/* Nav Links */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          padding: '8px 5px 10px 3px',
-          scrollbarWidth: 'thin',
-          scrollbarColor: '#1c1c3e transparent',
-        }}>
-          {NAV.map(section => renderSection(section))}
-        </div>
-
-        {/* Audio toggle & User / Logout */}
-        <div style={{
-          padding: '10px 12px 14px',
-          borderTop: '1px solid #121228',
-          flexShrink: 0,
-        }}>
-          {/* Sound toggle button */}
-          <button
-            onClick={toggleSound}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '5px 8px',
-              background: soundEnabled ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-              border: `1px solid ${soundEnabled ? 'rgba(34, 197, 94, 0.25)' : '#1e1e40'}`,
-              borderRadius: 6,
-              marginBottom: 10,
-              cursor: 'pointer',
-              fontSize: 11,
-              color: soundEnabled ? '#4ade80' : '#8892a8',
-              fontFamily: 'inherit',
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              {soundEnabled ? 'Звук алертов' : 'Без звука'}
-            </span>
-            <span style={{
-              fontSize: 9,
-              fontWeight: 700,
-              padding: '1px 4px',
-              borderRadius: 3,
-              background: soundEnabled ? '#22c55e' : '#334155',
-              color: '#fff',
+        {user ? (
+          <>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
             }}>
-              {soundEnabled ? 'ON' : 'OFF'}
-            </span>
-          </button>
-
-          {user ? (
-            <>
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+                width: 24, height: 24,
+                background: '#1a2538',
+                border: '1px solid #2d3b55',
+                borderRadius: 4,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: '#f1f5f9', flexShrink: 0,
               }}>
-                <div style={{
-                  width: 28, height: 28,
-                  background: 'linear-gradient(135deg, #6366f1, #a78bfa)',
-                  borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
-                }}>
-                  {(user.username || 'U')[0].toUpperCase()}
+                {(user.username || 'U')[0].toUpperCase()}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user.username}
                 </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#c4cfe0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {user.username}
-                  </div>
-                  <div style={{
-                    fontSize: 10.5,
-                    color: user.role === 'admin' ? '#f59e0b' : '#818cf8',
-                    marginTop: 1,
-                  }}>
-                    {user.role === 'admin' ? 'Администратор' : user.role === 'user' ? 'Пользователь' : 'Просмотр'}
-                  </div>
+                <div style={{
+                  fontSize: 10,
+                  color: user.role === 'admin' ? '#f59e0b' : '#3b82f6',
+                }}>
+                  {user.role === 'admin' ? 'Администратор' : 'Оператор'}
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  padding: '6px 10px',
-                  background: 'rgba(244,63,94,0.1)',
-                  color: '#f87171',
-                  border: '1px solid rgba(244,63,94,0.2)',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  transition: 'background 0.15s',
-                }}
-              >
-                <LogOut size={13} />
-                Выйти
-              </button>
-            </>
-          ) : (
-            <Link href="/auth/login" style={{
-              display: 'block',
-              padding: '7px 12px',
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-              color: '#fff',
-              borderRadius: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              textAlign: 'center',
-              textDecoration: 'none',
-            }}>
-              Войти
-            </Link>
-          )}
-        </div>
+            </div>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                padding: '4px 8px',
+                background: '#121722',
+                color: '#94a3b8',
+                border: '1px solid #1e293b',
+                borderRadius: 4,
+                fontSize: 11.5,
+                fontWeight: 500,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#7f1d1d' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.borderColor = '#1e293b' }}
+            >
+              <LogOut size={12} />
+              Выход
+            </button>
+          </>
+        ) : (
+          <Link href="/auth/login" style={{
+            display: 'block',
+            padding: '5px 10px',
+            background: '#2563eb',
+            color: '#fff',
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: 600,
+            textAlign: 'center',
+            textDecoration: 'none',
+          }}>
+            Войти в систему
+          </Link>
+        )}
       </div>
-    </>
+    </div>
   )
 }
