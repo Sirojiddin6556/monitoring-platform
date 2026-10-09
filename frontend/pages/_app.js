@@ -2,6 +2,7 @@ import '../styles/global.css'
 import Head from 'next/head'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { Toaster, toast } from 'sonner'
 import CommandPalette from '../components/CommandPalette'
 import apiFetch from '../lib/api'
 import { playAlertSound } from '../components/SoundAlert'
@@ -38,9 +39,12 @@ export default function App({ Component, pageProps }) {
           const firing = (res.alerts || res || []).filter(a => a.status === 'firing')
           const count = firing.length
 
-          // If new alert appeared, sound the alert
+          // If new alert appeared, sound the alert and show toast
           if (count > alertCount && alertCount > 0) {
             playAlertSound('critical')
+            toast.error(`Обнаружен критический инцидент! Активных алертов: ${count}`, {
+              description: 'Проверьте раздел "События > Алерты" для подробностей.'
+            })
           }
           setAlertCount(count)
 
@@ -76,6 +80,22 @@ export default function App({ Component, pageProps }) {
 
       {/* Global Quick Search (Ctrl+K) */}
       <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
+      {/* Modern Stacked Notifications (Sonner) */}
+      <Toaster 
+        theme="dark" 
+        position="top-right" 
+        richColors 
+        closeButton 
+        toastOptions={{
+          style: {
+            background: '#0d0d24',
+            border: '1px solid #1c1c3e',
+            color: '#e2e4f0',
+            fontFamily: 'inherit',
+          }
+        }}
+      />
     </>
   )
 }

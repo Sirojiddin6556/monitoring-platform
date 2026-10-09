@@ -1,31 +1,49 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
+import { 
+  BarChart3, 
+  Tv, 
+  LayoutDashboard, 
+  Server, 
+  AlertTriangle, 
+  LineChart, 
+  Bell, 
+  Settings, 
+  Shield, 
+  Search, 
+  Volume2, 
+  VolumeX, 
+  LogOut, 
+  ChevronDown, 
+  ChevronRight,
+  ExternalLink
+} from 'lucide-react'
 import { isSoundEnabled, setSoundEnabled, playAlertSound } from './SoundAlert'
 
 const NAV = [
   {
     id: "executive",
-    icon: "📊",
+    icon: <BarChart3 size={15} />,
     label: "Ситуационный Центр",
     href: "/executive",
   },
   {
     id: "noc",
-    icon: "📺",
+    icon: <Tv size={15} />,
     label: "NOC Экран (TV)",
     href: "/noc",
     badge: "LIVE",
   },
   {
     id: 'home',
-    icon: '⬡',
+    icon: <LayoutDashboard size={15} />,
     label: 'Главная',
     href: '/',
   },
   {
     id: 'resources',
-    icon: '▣',
+    icon: <Server size={15} />,
     label: 'Ресурсы',
     items: [
       { label: 'Серверы',               href: '/servers' },
@@ -48,7 +66,7 @@ const NAV = [
   },
   {
     id: 'events',
-    icon: '◈',
+    icon: <AlertTriangle size={15} />,
     label: 'События',
     items: [
       { label: 'Алерты',     href: '/alerts' },
@@ -58,7 +76,7 @@ const NAV = [
   },
   {
     id: 'analytics',
-    icon: '◫',
+    icon: <LineChart size={15} />,
     label: 'Аналитика',
     items: [
       { label: 'Дашборды', href: '/dashboards' },
@@ -68,7 +86,7 @@ const NAV = [
   },
   {
     id: 'notifications',
-    icon: '◎',
+    icon: <Bell size={15} />,
     label: 'Уведомления',
     adminOnly: true,
     items: [
@@ -79,7 +97,7 @@ const NAV = [
   },
   {
     id: 'system',
-    icon: '◌',
+    icon: <Settings size={15} />,
     label: 'Система',
     items: [
       { label: 'Обслуживание', href: '/maintenance' },
@@ -88,7 +106,7 @@ const NAV = [
   },
   {
     id: 'admin',
-    icon: '◉',
+    icon: <Shield size={15} />,
     label: 'Администрирование',
     adminOnly: true,
     items: [
@@ -142,7 +160,7 @@ function NavLeaf({ label, href, depth, pathname, external }) {
         }}
       >
         <span style={{ flex: 1 }}>{label}</span>
-        <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span>
+        <ExternalLink size={11} style={{ opacity: 0.6 }} />
       </a>
     )
   }
@@ -221,30 +239,41 @@ function NavSubGroup({ item, depth, pathname, open, toggle }) {
           fontSize: 12.5,
           textAlign: 'left',
           borderRadius: '0 6px 6px 0',
-          lineHeight: 1.5,
+          transition: 'color 0.12s, background 0.12s',
           fontFamily: 'inherit',
+          lineHeight: 1.5,
         }}
       >
         <span style={{ flex: 1 }}>{item.label}</span>
-        <span style={{
-          fontSize: 8,
+        <ChevronRight size={12} style={{
           color: '#3a4070',
           transition: 'transform 0.18s',
           transform: isOpen ? 'rotate(90deg)' : 'none',
-          display: 'inline-block',
-        }}>▶</span>
+        }} />
       </button>
-      {isOpen && item.items.map(sub =>
-        sub.soon
-          ? <NavSoon key={sub.label} label={sub.label} depth={depth + 1} />
-          : <NavLeaf key={sub.href} label={sub.label} href={sub.href} depth={depth + 1} pathname={pathname} external={sub.external} />
+
+      {isOpen && (
+        <div>
+          {item.items.map(sub => (
+            <NavLeaf
+              key={sub.href || sub.label}
+              label={sub.label}
+              href={sub.href}
+              depth={depth + 1}
+              pathname={pathname}
+              external={sub.external}
+            />
+          ))}
+        </div>
       )}
     </div>
   )
 }
 
-function TopLink({ href, icon, label, active, badge }) {
+function TopLevelLink({ icon, label, href, badge, pathname }) {
+  const active = href === pathname
   const [hover, setHover] = useState(false)
+
   return (
     <Link
       href={href}
@@ -253,7 +282,7 @@ function TopLink({ href, icon, label, active, badge }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 9,
         padding: '7px 10px',
         color: active ? '#a5b4fc' : hover ? '#c4cfe0' : '#8892a8',
         background: active ? 'rgba(99,102,241,0.12)' : hover ? 'rgba(255,255,255,0.04)' : 'none',
@@ -266,7 +295,9 @@ function TopLink({ href, icon, label, active, badge }) {
         marginBottom: 1,
       }}
     >
-      <span style={{ fontSize: 13, opacity: 0.8 }}>{icon}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', opacity: active ? 1 : 0.8, color: active ? '#818cf8' : 'inherit' }}>
+        {icon}
+      </span>
       <span style={{ flex: 1 }}>{label}</span>
       {badge && (
         <span style={{
@@ -296,14 +327,14 @@ function SectionHeader({ icon, label, isOpen, active, onClick }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 9,
         width: '100%',
-        padding: '6px 10px',
+        padding: '7px 10px',
         background: hover ? 'rgba(255,255,255,0.04)' : 'none',
         border: 'none',
         borderLeft: '2px solid transparent',
         cursor: 'pointer',
-        color: active ? '#a5b4fc' : hover ? '#8892a8' : '#505878',
+        color: active ? '#a5b4fc' : hover ? '#8892a8' : '#6272a4',
         fontSize: 12,
         fontWeight: 700,
         textAlign: 'left',
@@ -314,70 +345,55 @@ function SectionHeader({ icon, label, isOpen, active, onClick }) {
         letterSpacing: 0.5,
       }}
     >
-      <span style={{ fontSize: 11, opacity: 0.7 }}>{icon}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', opacity: active ? 1 : 0.7, color: active ? '#818cf8' : 'inherit' }}>
+        {icon}
+      </span>
       <span style={{ flex: 1 }}>{label}</span>
-      <span style={{
-        fontSize: 8,
-        color: '#3a4070',
+      <ChevronDown size={13} style={{
+        color: '#4a5078',
         transition: 'transform 0.18s',
-        transform: isOpen ? 'rotate(90deg)' : 'none',
-        display: 'inline-block',
-      }}>▶</span>
+        transform: isOpen ? 'none' : 'rotate(-90deg)',
+      }} />
     </button>
   )
 }
 
 export default function Sidebar() {
   const router = useRouter()
+  const pathname = router.pathname
+
   const [user, setUser] = useState(null)
+  const [soundEnabled, setSoundState] = useState(true)
   const [open, setOpen] = useState({})
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [soundEnabled, setSoundState] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem('user')
-    if (stored) setUser(JSON.parse(stored))
+    try {
+      const u = localStorage.getItem('user')
+      if (u) setUser(JSON.parse(u))
+    } catch {}
     setSoundState(isSoundEnabled())
   }, [])
 
+  // Auto-expand active section
+  useEffect(() => {
+    NAV.forEach(sec => {
+      if (sec.items && anyChildActive(sec.items, pathname)) {
+        setOpen(prev => ({ ...prev, [sec.id]: true }))
+      }
+    })
+  }, [pathname])
+
+  const toggleSection = (id) => {
+    setOpen(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
   const toggleSound = () => {
     const next = !soundEnabled
-    setSoundState(next)
     setSoundEnabled(next)
-    if (next) playAlertSound('recovery')
+    setSoundState(next)
+    if (next) playAlertSound('info')
   }
-
-  const openSearch = () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
-  }
-
-  // Close the mobile off-canvas drawer whenever the route changes.
-  useEffect(() => {
-    const close = () => setMobileOpen(false)
-    router.events.on('routeChangeStart', close)
-    return () => router.events.off('routeChangeStart', close)
-  }, [router.events])
-
-  useEffect(() => {
-    const autoOpen = {}
-    for (const section of NAV) {
-      if (section.items) {
-        if (anyChildActive(section.items, router.pathname)) autoOpen[section.id] = true
-        for (const item of section.items) {
-          if (item.items && anyChildActive(item.items, router.pathname)) {
-            autoOpen[item.id] = true
-            autoOpen[section.id] = true
-          }
-        }
-      }
-    }
-    setOpen(prev => ({ ...prev, ...autoOpen }))
-  }, [router.pathname])
-
-  const toggle = (id) => setOpen(prev => ({ ...prev, [id]: !prev[id] }))
-
-  const isAdmin = user?.role === 'admin'
-  const pathname = router.pathname
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -385,44 +401,65 @@ export default function Sidebar() {
     router.push('/auth/login')
   }
 
-  function renderSection(section) {
-    if (section.adminOnly && !isAdmin) return null
+  const isAdmin = user?.role === 'admin'
 
-    if (section.href) {
-      const active = section.href === pathname || (section.href !== '/' && pathname.startsWith(section.href + '/'))
-      return <TopLink key={section.id} href={section.href} icon={section.icon} label={section.label} active={active} badge={section.badge} />
+  const renderSection = (sec) => {
+    if (sec.adminOnly && !isAdmin) return null
+
+    if (sec.href) {
+      return (
+        <TopLevelLink
+          key={sec.id}
+          icon={sec.icon}
+          label={sec.label}
+          href={sec.href}
+          badge={sec.badge}
+          pathname={pathname}
+        />
+      )
     }
 
-    const groupActive = anyChildActive(section.items, pathname)
-    const isOpen = open[section.id] !== undefined ? open[section.id] : groupActive
+    const hasActiveChild = anyChildActive(sec.items, pathname)
+    const isOpen = open[sec.id] !== undefined ? open[sec.id] : hasActiveChild
 
     return (
-      <div key={section.id} style={{ marginBottom: 1 }}>
+      <div key={sec.id} style={{ marginBottom: 2 }}>
         <SectionHeader
-          icon={section.icon}
-          label={section.label}
+          icon={sec.icon}
+          label={sec.label}
           isOpen={isOpen}
-          active={groupActive}
-          onClick={() => toggle(section.id)}
+          active={hasActiveChild}
+          onClick={() => toggleSection(sec.id)}
         />
         {isOpen && (
-          <div style={{ paddingBottom: 2 }}>
-            {section.items.map(item => {
-              if (item.adminOnly && !isAdmin) return null
-              if (item.items) {
+          <div style={{ paddingBottom: 4 }}>
+            {sec.items.map(it => {
+              if (it.adminOnly && !isAdmin) return null
+              if (it.items) {
                 return (
                   <NavSubGroup
-                    key={item.id}
-                    item={item}
-                    depth={0}
+                    key={it.id}
+                    item={it}
+                    depth={1}
                     pathname={pathname}
                     open={open}
-                    toggle={toggle}
+                    toggle={toggleSection}
                   />
                 )
               }
-              if (item.soon) return <NavSoon key={item.label} label={item.label} depth={0} />
-              return <NavLeaf key={item.href} label={item.label} href={item.href} depth={0} pathname={pathname} external={item.external} />
+              if (it.soon) {
+                return <NavSoon key={it.label} label={it.label} depth={1} />
+              }
+              return (
+                <NavLeaf
+                  key={it.href || it.label}
+                  label={it.label}
+                  href={it.href}
+                  depth={1}
+                  pathname={pathname}
+                  external={it.external}
+                />
+              )
             })}
           </div>
         )}
@@ -432,199 +469,242 @@ export default function Sidebar() {
 
   return (
     <>
-      <button
-        className="sidebar-toggle"
-        onClick={() => setMobileOpen(v => !v)}
-        aria-label={mobileOpen ? 'Закрыть меню' : 'Открыть меню'}
-      >
-        {mobileOpen ? '✕' : '☰'}
-      </button>
-      <div
-        className={`sidebar-backdrop${mobileOpen ? ' open' : ''}`}
-        onClick={() => setMobileOpen(false)}
-      />
-      <div className={`sidebar-root${mobileOpen ? ' open' : ''}`} style={{
+      {/* Mobile top navbar button */}
+      <div style={{
+        display: 'none',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 50,
+        background: '#07071a',
+        borderBottom: '1px solid #1c1c3e',
+        zIndex: 999,
+        padding: '0 16px',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }} className="mobile-header">
+        <div style={{ fontWeight: 800, color: '#e2e4f0', fontSize: 15 }}>
+          <span style={{ color: '#6366f1' }}>⚡</span> MONITORING
+        </div>
+        <button
+          onClick={() => setSidebarOpen(prev => !prev)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#8892a8',
+            fontSize: 20,
+            cursor: 'pointer',
+            padding: 4,
+          }}
+        >
+          ☰
+        </button>
+      </div>
+
+      <div style={{
+        width: 220,
+        height: '100vh',
+        background: '#07071a',
+        borderRight: '1px solid #1c1c3e',
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
-        width: 220,
         flexShrink: 0,
-        overflow: 'hidden',
-        background: 'linear-gradient(180deg, #0a0a1e 0%, #070712 100%)',
-        borderRight: '1px solid #1c1c3e',
+        position: 'sticky',
+        top: 0,
+        userSelect: 'none',
+        zIndex: 50,
       }}>
-      {/* Logo */}
-      <div style={{
-        padding: '13px 14px 11px',
-        borderBottom: '1px solid #121228',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+        {/* Brand Header */}
+        <div style={{
+          padding: '16px 14px 12px',
+          borderBottom: '1px solid #121228',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
           <div style={{
-            width: 26, height: 26,
-            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-            borderRadius: 7,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, flexShrink: 0,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'linear-gradient(135deg, #6366f1, #38bdf8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             boxShadow: '0 0 12px rgba(99,102,241,0.4)',
-          }}>⬡</div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e4f0', letterSpacing: 0.1 }}>Monitoring</span>
+            color: '#fff',
+            fontWeight: 900,
+            fontSize: 16,
+          }}>
+            ⚡
+          </div>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#e2e4f0', letterSpacing: 0.3 }}>
+              MONITORING
+            </div>
+            <div style={{ fontSize: 10, color: '#4a5078', fontWeight: 600 }}>
+              PLATFORM PRO
+            </div>
+          </div>
         </div>
 
-        {/* Quick Search Button */}
-        <button
-          onClick={openSearch}
-          style={{
-            marginTop: 10,
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
-            padding: '5px 8px',
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid #1e1e40',
-            borderRadius: 6,
-            color: '#8892a8',
-            fontSize: 11.5,
-            cursor: 'pointer',
-            transition: 'border-color 0.15s, background 0.15s',
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'
-            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = '#1e1e40'
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
-          }}
-        >
-          <span style={{ fontSize: 12 }}>🔍</span>
-          <span style={{ flex: 1, textAlign: 'left' }}>Поиск...</span>
-          <kbd style={{
-            fontSize: 9,
-            background: '#121228',
-            color: '#6366f1',
-            padding: '1px 5px',
-            borderRadius: 3,
-            border: '1px solid #1c1c3e',
-            fontWeight: 700,
-          }}>Ctrl K</kbd>
-        </button>
-      </div>
+        {/* Global Quick Search Pill (Ctrl+K) */}
+        <div style={{ padding: '8px 10px 4px' }}>
+          <button
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+              window.dispatchEvent(event)
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 10px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid #1a1a36',
+              borderRadius: 6,
+              color: '#6272a4',
+              fontSize: 11.5,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'border-color 0.15s',
+            }}
+          >
+            <Search size={13} style={{ color: '#6366f1' }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Быстрый поиск</span>
+            <kbd style={{
+              fontSize: 9,
+              background: '#121228',
+              color: '#818cf8',
+              padding: '1px 5px',
+              borderRadius: 3,
+              border: '1px solid #1c1c3e',
+              fontWeight: 700,
+            }}>Ctrl K</kbd>
+          </button>
+        </div>
 
-      {/* Nav */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        padding: '8px 5px 10px 3px',
-        scrollbarWidth: 'thin',
-        scrollbarColor: '#1c1c3e transparent',
-      }}>
-        {NAV.map(section => renderSection(section))}
-      </div>
+        {/* Nav Links */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: '8px 5px 10px 3px',
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#1c1c3e transparent',
+        }}>
+          {NAV.map(section => renderSection(section))}
+        </div>
 
-      {/* Audio toggle & User / Logout */}
-      <div style={{
-        padding: '10px 12px 14px',
-        borderTop: '1px solid #121228',
-        flexShrink: 0,
-      }}>
-        {/* Sound toggle pill */}
-        <button
-          onClick={toggleSound}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '5px 8px',
-            background: soundEnabled ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${soundEnabled ? 'rgba(34, 197, 94, 0.25)' : '#1e1e40'}`,
-            borderRadius: 6,
-            marginBottom: 10,
-            cursor: 'pointer',
-            fontSize: 11,
-            color: soundEnabled ? '#4ade80' : '#8892a8',
-            fontFamily: 'inherit',
-          }}
-        >
-          <span>{soundEnabled ? '🔊 Звуковые алерты' : '🔇 Звук выключен'}</span>
-          <span style={{
-            fontSize: 9,
-            fontWeight: 700,
-            padding: '1px 4px',
-            borderRadius: 3,
-            background: soundEnabled ? '#22c55e' : '#334155',
-            color: '#fff',
-          }}>
-            {soundEnabled ? 'ON' : 'OFF'}
-          </span>
-        </button>
-
-        {user ? (
-          <>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+        {/* Audio toggle & User / Logout */}
+        <div style={{
+          padding: '10px 12px 14px',
+          borderTop: '1px solid #121228',
+          flexShrink: 0,
+        }}>
+          {/* Sound toggle button */}
+          <button
+            onClick={toggleSound}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '5px 8px',
+              background: soundEnabled ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+              border: `1px solid ${soundEnabled ? 'rgba(34, 197, 94, 0.25)' : '#1e1e40'}`,
+              borderRadius: 6,
+              marginBottom: 10,
+              cursor: 'pointer',
+              fontSize: 11,
+              color: soundEnabled ? '#4ade80' : '#8892a8',
+              fontFamily: 'inherit',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+              {soundEnabled ? 'Звук алертов' : 'Без звука'}
+            </span>
+            <span style={{
+              fontSize: 9,
+              fontWeight: 700,
+              padding: '1px 4px',
+              borderRadius: 3,
+              background: soundEnabled ? '#22c55e' : '#334155',
+              color: '#fff',
             }}>
+              {soundEnabled ? 'ON' : 'OFF'}
+            </span>
+          </button>
+
+          {user ? (
+            <>
               <div style={{
-                width: 28, height: 28,
-                background: 'linear-gradient(135deg, #6366f1, #a78bfa)',
-                borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
               }}>
-                {(user.username || 'U')[0].toUpperCase()}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#c4cfe0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user.username}
-                </div>
                 <div style={{
-                  fontSize: 10.5,
-                  color: user.role === 'admin' ? '#f59e0b' : '#818cf8',
-                  marginTop: 1,
+                  width: 28, height: 28,
+                  background: 'linear-gradient(135deg, #6366f1, #a78bfa)',
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
                 }}>
-                  {user.role === 'admin' ? 'Администратор' : user.role === 'user' ? 'Пользователь' : 'Просмотр'}
+                  {(user.username || 'U')[0].toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#c4cfe0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user.username}
+                  </div>
+                  <div style={{
+                    fontSize: 10.5,
+                    color: user.role === 'admin' ? '#f59e0b' : '#818cf8',
+                    marginTop: 1,
+                  }}>
+                    {user.role === 'admin' ? 'Администратор' : user.role === 'user' ? 'Пользователь' : 'Просмотр'}
+                  </div>
                 </div>
               </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                background: 'rgba(244,63,94,0.1)',
-                color: '#f87171',
-                border: '1px solid rgba(244,63,94,0.2)',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                transition: 'background 0.15s',
-              }}
-            >
-              Выйти
-            </button>
-          </>
-        ) : (
-          <Link href="/auth/login" style={{
-            display: 'block',
-            padding: '7px 12px',
-            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            color: '#fff',
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            textAlign: 'center',
-            textDecoration: 'none',
-          }}>
-            Войти
-          </Link>
-        )}
-      </div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  padding: '6px 10px',
+                  background: 'rgba(244,63,94,0.1)',
+                  color: '#f87171',
+                  border: '1px solid rgba(244,63,94,0.2)',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  transition: 'background 0.15s',
+                }}
+              >
+                <LogOut size={13} />
+                Выйти
+              </button>
+            </>
+          ) : (
+            <Link href="/auth/login" style={{
+              display: 'block',
+              padding: '7px 12px',
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              color: '#fff',
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 600,
+              textAlign: 'center',
+              textDecoration: 'none',
+            }}>
+              Войти
+            </Link>
+          )}
+        </div>
       </div>
     </>
   )
