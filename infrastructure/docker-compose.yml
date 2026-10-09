@@ -132,25 +132,25 @@ services:
           memory: 128M
     restart: unless-stopped
 
-  agent:
-    build:
-      context: ../agent
-    depends_on:
-      backend:
-        condition: service_healthy
-    environment:
-      - BACKEND_URL=http://backend:8000
-      - SERVER_ID=srv-docker-host
-      - INGEST_API_KEY=${INGEST_API_KEY}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 64M
-    restart: unless-stopped
+#  agent:
+#    build:
+#      context: ../agent
+#    depends_on:
+#      backend:
+#        condition: service_healthy
+#    environment:
+#      - BACKEND_URL=http://backend:8000
+#      - SERVER_ID=srv-docker-host
+#      - INGEST_API_KEY=${INGEST_API_KEY}
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#    deploy:
+#      resources:
+#        limits:
+#          memory: 256M
+#        reservations:
+#          memory: 64M
+#    restart: unless-stopped
 
   prober:
     build:
