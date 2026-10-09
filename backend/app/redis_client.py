@@ -17,7 +17,10 @@ async def get_redis() -> Optional[Any]:
         return None
     if _redis is None:
         try:
-            import aioredis
+            try:
+                import redis.asyncio as aioredis
+            except (ImportError, TypeError):
+                import aioredis
             _redis = await aioredis.from_url(
                 REDIS_URL,
                 encoding="utf-8",

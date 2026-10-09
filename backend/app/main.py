@@ -162,6 +162,9 @@ from .routers import sla as _sla_router
 from .routers import server_configs as _server_configs_router
 from .routers import dashboards as _dashboards_router
 from .routers import metrics as _metrics_router
+from .routers import databases as _databases_router
+from .routers import servers as _servers_router
+from .routers import docker as _docker_router
 
 app.include_router(_auth_router.router)
 app.include_router(_incidents_router.router)
@@ -170,6 +173,9 @@ app.include_router(_sla_router.router)
 app.include_router(_server_configs_router.router)
 app.include_router(_dashboards_router.router)
 app.include_router(_metrics_router.router)
+app.include_router(_databases_router.router)
+app.include_router(_servers_router.router)
+app.include_router(_docker_router.router)
 
 
 # Payloads moved to schemas.py
@@ -191,33 +197,26 @@ async def ping():
     return {"ping": "pong"}
 
 
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+# Centralized thread-safe core state
+from .core.state import (
+    manager,
+    ConnectionManager,
+    SERVERS,
+    WEBSITES,
+    AGENT_METRICS,
+    SSL_INFO,
+    METRICS_STORE,
+    PROBES_STORE,
+    LOGS_STORE,
+    APP_SETTINGS,
+    PENDING_AGENT_UPGRADES,
+)
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def send_json(self, message: dict):
-        for conn in list(self.active_connections):
-            try:
-                await conn.send_json(message)
-            except Exception:
-                self.disconnect(conn)
-
-
-manager = ConnectionManager()
 
 # In-memory stores (simple integrated monitoring)
-METRICS_STORE: list[dict] = []
-PROBES_STORE: list[dict] = []
-LOGS_STORE: list[dict] = []
-
+# METRICS_STORE imported from core.state
+# PROBES_STORE imported from core.state
+# LOGS_STORE imported from core.state
 # Глобальные настройки мониторинга (загружаются из БД при старте)
 DEFAULT_SETTINGS = {
     'ping_interval': {'value': '15', 'description': 'Интервал пинга серверов (секунды)'},
@@ -510,15 +509,12 @@ async def startup_event():
         _logging.getLogger('main').warning(f"Telegram bot auto-start: {e}")
 
 # Seeded resources for integrated monitoring (servers and websites)
-SERVERS: list[dict] = []
-
-WEBSITES: list[dict] = []
-
+# SERVERS imported from core.state
+# WEBSITES imported from core.state
 # Хранилище последних метрик от агентов (server_id -> {metrics, timestamp, ...extended data})
-AGENT_METRICS: dict = {}
+# AGENT_METRICS imported from core.state
 # Хранилище SSL-информации для сайтов (url -> {issuer, expires, days_left, ...})
-SSL_INFO: dict = {}
-
+# SSL_INFO imported from core.state
 # WebSocket endpoint moved to routers/metrics.py
 
 
@@ -1744,199 +1740,7 @@ async def trigger_upgrade_all(current_user: dict = Depends(get_admin_user)):
 # --- Resources endpoints for UI tabs ---
 
 
-@app.get('/api/servers')
-async def list_servers(request: Request, current_user: dict = Depends(get_current_user)):
-    # Фильтрация по организации
-    user_org_ids = None
-    role = current_user.get("role")
-    if role != "admin":
-        user_org_ids = current_user.get("org_ids", [])
-
-    # Загрузить org_id из БД для серверов
-    server_org_map = {}
-    async with db.get_session() as session:
-        res = await session.execute(select(ServerModel))
-        db_servers = res.scalars().all()
-        existing_ids = {s['id'] for s in SERVERS}
-        for srv in db_servers:
-            server_org_map[srv.id] = getattr(srv, 'org_id', None)
-            if srv.id not in existing_ids:
-                SERVERS.append({
-                    'id': srv.id, 'name': srv.name, 'host': srv.host,
-                    'org_id': getattr(srv, 'org_id', None),
-                    'monitor_type': getattr(srv, 'monitor_type', 'agent') or 'agent',
-                    'ssh_user': getattr(srv, 'ssh_user', None),
-                    'ssh_port': getattr(srv, 'ssh_port', 22),
-                    'ssh_password': decrypt_field(getattr(srv, 'ssh_password', None)),
-                    'ssh_key_path': getattr(srv, 'ssh_key_path', None),
-                    'winrm_user': getattr(srv, 'winrm_user', None),
-                    'winrm_password': decrypt_field(getattr(srv, 'winrm_password', None)),
-                    'winrm_port': getattr(srv, 'winrm_port', 5985),
-                    'winrm_use_ssl': getattr(srv, 'winrm_use_ssl', False),
-                })
-        res2 = await session.execute(
-            select(AgentTokenModel.server_id, func.count())
-            .where(AgentTokenModel.is_active == True)
-            .group_by(AgentTokenModel.server_id)
-        )
-        active_token_counts = {row[0]: row[1] for row in res2.all()}
-    
-    servers_out = []
-    now_ts = int(time.time())
-    agent_fresh_ttl = int(APP_SETTINGS.get('agent_fresh_ttl', '90'))
-    for s in SERVERS:
-        oid = s.get('org_id') or server_org_map.get(s['id'])
-        # Фильтр по организации: не-админы видят только серверы своих организаций
-        if user_org_ids is not None:
-            if oid is None or oid not in user_org_ids:
-                continue
-        status_val = 'unknown'
-        last_ping = None
-        last_metrics = None
-        for m in reversed(METRICS_STORE[-500:]):
-            payload = m.get('payload', {})
-            if payload.get('server_id') == s['id']:
-                status_val = payload.get('status', 'ok')
-                last_ping = payload.get('value')
-                last_metrics = payload.get('metrics')
-                break
-
-        # Для monitor_type=agent принудительно считаем down, если агент не присылал
-        # свежих данных в пределах TTL. Это убирает эффект "ещё активен" после Stop.
-        if s.get('monitor_type', 'agent') == 'agent':
-            agent_data = AGENT_METRICS.get(s['id']) or {}
-            agent_ts = int(agent_data.get('timestamp') or 0)
-            if (now_ts - agent_ts) > agent_fresh_ttl:
-                status_val = 'down'
-
-        _agent_full = AGENT_METRICS.get(s['id'])
-        # Исключаем тяжёлые поля из списка серверов — они доступны через /detail
-        _agent_light = {k: v for k, v in (_agent_full or {}).items()
-                        if k not in ('recent_logs', 'processes_detail', 'docker_containers', 'virtual_machines', 'services')} or None
-        servers_out.append({
-            'id': s['id'], 'name': s['name'], 'host': s.get('host'),
-            'org_id': oid,
-            'monitor_type': s.get('monitor_type', 'agent'),
-            'status': status_val, 'last_ping': last_ping, 'last_metrics': last_metrics,
-            'agent_data': _agent_light,
-            'agent_key_count': active_token_counts.get(s['id'], 0),
-        })
-    return {'servers': servers_out}
-
-
-@app.post('/api/servers')
-async def create_server(data: ServerCreate, current_user: dict = Depends(get_current_user)):
-    """Добавить новый сервер"""
-    # Проверить что ID не занят
-    for s in SERVERS:
-        if s['id'] == data.id:
-            raise HTTPException(status_code=400, detail='Server with this ID already exists')
-    async with db.get_session() as session:
-        res = await session.execute(select(ServerModel).where(ServerModel.id == data.id))
-        if res.scalars().first():
-            raise HTTPException(status_code=400, detail='Server with this ID already exists')
-        server = ServerModel(
-            id=data.id, name=data.name, host=data.host,
-            org_id=data.org_id,
-            monitor_type=data.monitor_type or 'agent',
-            ssh_user=data.ssh_user, ssh_port=data.ssh_port or 22,
-            ssh_password=encrypt_field(data.ssh_password), ssh_key_path=data.ssh_key_path,
-            winrm_user=data.winrm_user, winrm_password=encrypt_field(data.winrm_password),
-            winrm_port=data.winrm_port or 5985, winrm_use_ssl=data.winrm_use_ssl or False,
-        )
-        session.add(server)
-        await session.commit()
-    new_server = {
-        'id': data.id, 'name': data.name, 'host': data.host,
-        'org_id': data.org_id,
-        'monitor_type': data.monitor_type or 'agent',
-        'ssh_user': data.ssh_user, 'ssh_port': data.ssh_port or 22,
-        # Never store plaintext credentials in memory — use encrypted DB values
-        'ssh_key_path': data.ssh_key_path,
-        'winrm_user': data.winrm_user,
-        'winrm_port': data.winrm_port or 5985, 'winrm_use_ssl': data.winrm_use_ssl or False,
-    }
-    SERVERS.append(new_server)
-    response = {
-        'id': data.id, 'name': data.name, 'host': data.host, 'org_id': data.org_id,
-        'monitor_type': data.monitor_type or 'agent'
-    }
-    if data.create_agent_token:
-        token_value = secrets.token_urlsafe(32)
-        async with db.get_session() as session:
-            key = AgentTokenModel(server_id=data.id, token=token_value, is_active=True)
-            session.add(key)
-            await session.commit()
-            await session.refresh(key)
-        response['agent_token'] = token_value
-
-    return response
-
-
-@app.get('/api/servers/{server_id}/agent-keys', response_model=list[AgentTokenResponse])
-async def list_server_agent_keys(server_id: str, current_user: dict = Depends(get_admin_user)):
-    async with db.get_session() as session:
-        server = await session.get(ServerModel, server_id)
-        if not server:
-            raise HTTPException(status_code=404, detail='Server not found')
-        res = await session.execute(select(AgentTokenModel).where(AgentTokenModel.server_id == server_id).order_by(AgentTokenModel.created_at.desc()))
-        return res.scalars().all()
-
-
-@app.post('/api/servers/{server_id}/agent-key', response_model=AgentTokenResponse)
-async def create_server_agent_key(server_id: str, current_user: dict = Depends(get_admin_user)):
-    async with db.get_session() as session:
-        server = await session.get(ServerModel, server_id)
-        if not server:
-            raise HTTPException(status_code=404, detail='Server not found')
-        token_value = secrets.token_urlsafe(32)
-        key = AgentTokenModel(server_id=server_id, token=token_value, is_active=True)
-        session.add(key)
-        await session.commit()
-        await session.refresh(key)
-    return key
-
-
-@app.delete('/api/servers/{server_id}/agent-keys/{key_id}')
-async def revoke_server_agent_key(server_id: str, key_id: int, current_user: dict = Depends(get_admin_user)):
-    async with db.get_session() as session:
-        server = await session.get(ServerModel, server_id)
-        if not server:
-            raise HTTPException(status_code=404, detail='Server not found')
-        token = await session.get(AgentTokenModel, key_id)
-        if not token or token.server_id != server_id:
-            raise HTTPException(status_code=404, detail='Agent key not found for this server')
-        token.is_active = False
-        await session.commit()
-    return {'message': 'revoked'}
-
-
-@app.delete('/api/servers/{server_id}')
-async def delete_server(server_id: str, current_user: dict = Depends(get_current_user)):
-    """Удалить сервер"""
-    async with db.get_session() as session:
-        res = await session.execute(select(ServerModel).where(ServerModel.id == server_id))
-        server = res.scalars().first()
-        if not server:
-            raise HTTPException(status_code=404, detail='Server not found')
-        await session.delete(server)
-        await session.commit()
-    SERVERS[:] = [s for s in SERVERS if s['id'] != server_id]
-    return {'message': 'Server deleted'}
-
-
-@app.get('/api/servers/{server_id}/metrics')
-async def server_metrics(server_id: str, limit: int = 500, from_ts: int = None, to_ts: int = None, current_user: dict = Depends(get_current_user)):
-    limit = max(1, min(limit, 1000))
-    if from_ts is not None and to_ts is not None and from_ts > to_ts:
-        raise HTTPException(status_code=400, detail='from_ts must be less than or equal to to_ts')
-    items = [m for m in METRICS_STORE if m.get('payload', {}).get('server_id') == server_id]
-    if from_ts is not None:
-        items = [m for m in items if m.get('received_at', 0) >= from_ts]
-    if to_ts is not None:
-        items = [m for m in items if m.get('received_at', 0) <= to_ts]
-    return {'metrics': items[-limit:]}
-
+# (Server routes moved to .routers.servers)
 
 @app.get('/api/websites')
 async def list_websites(request: Request, current_user: dict = Depends(get_current_user)):
@@ -2455,17 +2259,7 @@ async def server_detail(server_id: str, current_user: dict = Depends(get_current
     }
 
 
-# Prometheus metrics
-REQUESTS_PING = Counter('backend_requests_ping_total', 'Count of ping requests')
-REQUESTS_METRICS = Counter('backend_requests_metrics_total', 'Count of metrics POSTs')
-REQUESTS_PROBE = Counter('backend_requests_probe_total', 'Count of probe POSTs')
-
-# Uptime gauge
-START_TIME = time.time()
-REQUESTS_UPTIME = Gauge('backend_uptime_seconds', 'Backend uptime in seconds')
-
-
-# --- Admin endpoints for user management ---
+# (Databases route moved to .routers.databases)
 
 @app.get('/api/admin/users', response_model=list[UserResponse])
 async def list_users(current_user: dict = Depends(get_admin_user)):
@@ -2703,44 +2497,7 @@ async def cleanup_data(current_user: dict = Depends(get_admin_user)):
 # DOCKER — Агрегированный вид со всех серверов
 # ============================================================
 
-@app.get('/api/docker/containers')
-async def docker_all_containers(current_user: dict = Depends(get_admin_user)):
-    """Агрегированный список Docker-контейнеров со всех серверов"""
-    result = []
-    for s in SERVERS:
-        agent = AGENT_METRICS.get(s['id'])
-        if not agent:
-            continue
-        containers = agent.get('docker_containers')
-        if not containers:
-            continue
-        for c in containers:
-            result.append({**c, 'server_id': s['id'], 'server_name': s.get('name', s['id'])})
-    return {'containers': result, 'total': len(result)}
-
-
-@app.get('/api/docker/stats')
-async def docker_stats(current_user: dict = Depends(get_admin_user)):
-    """Статистика Docker по всем серверам"""
-    total = 0
-    running = 0
-    stopped = 0
-    servers_with_docker = 0
-    for s in SERVERS:
-        agent = AGENT_METRICS.get(s['id'])
-        if not agent:
-            continue
-        containers = agent.get('docker_containers')
-        if containers is not None:
-            servers_with_docker += 1
-            for c in containers:
-                total += 1
-                if c.get('status') == 'running':
-                    running += 1
-                else:
-                    stopped += 1
-    return {'total': total, 'running': running, 'stopped': stopped, 'servers_with_docker': servers_with_docker}
-
+# (Docker routes moved to .routers.docker)
 
 # ============================================================
 # KUBERNETES — Мониторинг
@@ -4370,29 +4127,7 @@ async def remove_org_member(org_id: int, user_id: int, current_user: dict = Depe
     return {'message': 'User removed from organization'}
 
 
-@app.put('/api/servers/{server_id}/organization')
-async def assign_server_to_org(server_id: str, request: Request, current_user: dict = Depends(get_admin_user)):
-    """Привязать сервер к организации"""
-    body = await request.json()
-    org_id = body.get('org_id')  # None = убрать из организации
-    async with db.get_session() as session:
-        res = await session.execute(select(ServerModel).where(ServerModel.id == server_id))
-        server = res.scalars().first()
-        if not server:
-            raise HTTPException(status_code=404, detail='Server not found')
-        if org_id is not None:
-            org_res = await session.execute(select(OrganizationModel).where(OrganizationModel.id == org_id))
-            if not org_res.scalars().first():
-                raise HTTPException(status_code=404, detail='Organization not found')
-        server.org_id = org_id
-        await session.commit()
-    # Обновить in-memory
-    for s in SERVERS:
-        if s['id'] == server_id:
-            s['org_id'] = org_id
-            break
-    return {'message': 'Server organization updated'}
-
+# (Server organization route moved to .routers.servers)
 
 @app.put('/api/websites/{website_id}/organization')
 async def assign_website_to_org(website_id: str, request: Request, current_user: dict = Depends(get_admin_user)):
