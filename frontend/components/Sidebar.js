@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useState, useEffect } from 'react'
+import { isSoundEnabled, setSoundEnabled, playAlertSound } from './SoundAlert'
 
 const NAV = [
   {
@@ -8,6 +9,13 @@ const NAV = [
     icon: "📊",
     label: "Ситуационный Центр",
     href: "/executive",
+  },
+  {
+    id: "noc",
+    icon: "📺",
+    label: "NOC Экран (TV)",
+    href: "/noc",
+    badge: "LIVE",
   },
   {
     id: 'home',
@@ -235,16 +243,113 @@ function NavSubGroup({ item, depth, pathname, open, toggle }) {
   )
 }
 
+function TopLink({ href, icon, label, active, badge }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <Link
+      href={href}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 10px',
+        color: active ? '#a5b4fc' : hover ? '#c4cfe0' : '#8892a8',
+        background: active ? 'rgba(99,102,241,0.12)' : hover ? 'rgba(255,255,255,0.04)' : 'none',
+        borderLeft: `2px solid ${active ? '#6366f1' : 'transparent'}`,
+        fontSize: 13,
+        fontWeight: 600,
+        textDecoration: 'none',
+        borderRadius: '0 7px 7px 0',
+        transition: 'color 0.12s, background 0.12s',
+        marginBottom: 1,
+      }}
+    >
+      <span style={{ fontSize: 13, opacity: 0.8 }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {badge && (
+        <span style={{
+          fontSize: 9,
+          fontWeight: 800,
+          background: 'linear-gradient(135deg, #6366f1, #38bdf8)',
+          color: '#ffffff',
+          padding: '1px 5px',
+          borderRadius: 4,
+          letterSpacing: 0.5,
+          boxShadow: '0 0 8px rgba(99,102,241,0.5)',
+        }}>
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+}
+
+function SectionHeader({ icon, label, isOpen, active, onClick }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        padding: '6px 10px',
+        background: hover ? 'rgba(255,255,255,0.04)' : 'none',
+        border: 'none',
+        borderLeft: '2px solid transparent',
+        cursor: 'pointer',
+        color: active ? '#a5b4fc' : hover ? '#8892a8' : '#505878',
+        fontSize: 12,
+        fontWeight: 700,
+        textAlign: 'left',
+        borderRadius: '0 7px 7px 0',
+        marginBottom: 1,
+        fontFamily: 'inherit',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+      }}
+    >
+      <span style={{ fontSize: 11, opacity: 0.7 }}>{icon}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      <span style={{
+        fontSize: 8,
+        color: '#3a4070',
+        transition: 'transform 0.18s',
+        transform: isOpen ? 'rotate(90deg)' : 'none',
+        display: 'inline-block',
+      }}>▶</span>
+    </button>
+  )
+}
+
 export default function Sidebar() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [open, setOpen] = useState({})
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [soundEnabled, setSoundState] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('user')
     if (stored) setUser(JSON.parse(stored))
+    setSoundState(isSoundEnabled())
   }, [])
+
+  const toggleSound = () => {
+    const next = !soundEnabled
+    setSoundState(next)
+    setSoundEnabled(next)
+    if (next) playAlertSound('recovery')
+  }
+
+  const openSearch = () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+  }
 
   // Close the mobile off-canvas drawer whenever the route changes.
   useEffect(() => {
@@ -285,7 +390,7 @@ export default function Sidebar() {
 
     if (section.href) {
       const active = section.href === pathname || (section.href !== '/' && pathname.startsWith(section.href + '/'))
-      return <TopLink key={section.id} href={section.href} icon={section.icon} label={section.label} active={active} />
+      return <TopLink key={section.id} href={section.href} icon={section.icon} label={section.label} active={active} badge={section.badge} />
     }
 
     const groupActive = anyChildActive(section.items, pathname)
@@ -350,7 +455,7 @@ export default function Sidebar() {
       }}>
       {/* Logo */}
       <div style={{
-        padding: '15px 14px 13px',
+        padding: '13px 14px 11px',
         borderBottom: '1px solid #121228',
         flexShrink: 0,
       }}>
@@ -365,6 +470,47 @@ export default function Sidebar() {
           }}>⬡</div>
           <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e4f0', letterSpacing: 0.1 }}>Monitoring</span>
         </div>
+
+        {/* Quick Search Button */}
+        <button
+          onClick={openSearch}
+          style={{
+            marginTop: 10,
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '5px 8px',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid #1e1e40',
+            borderRadius: 6,
+            color: '#8892a8',
+            fontSize: 11.5,
+            cursor: 'pointer',
+            transition: 'border-color 0.15s, background 0.15s',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.5)'
+            e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = '#1e1e40'
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+          }}
+        >
+          <span style={{ fontSize: 12 }}>🔍</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>Поиск...</span>
+          <kbd style={{
+            fontSize: 9,
+            background: '#121228',
+            color: '#6366f1',
+            padding: '1px 5px',
+            borderRadius: 3,
+            border: '1px solid #1c1c3e',
+            fontWeight: 700,
+          }}>Ctrl K</kbd>
+        </button>
       </div>
 
       {/* Nav */}
@@ -379,12 +525,44 @@ export default function Sidebar() {
         {NAV.map(section => renderSection(section))}
       </div>
 
-      {/* User / Logout */}
+      {/* Audio toggle & User / Logout */}
       <div style={{
         padding: '10px 12px 14px',
         borderTop: '1px solid #121228',
         flexShrink: 0,
       }}>
+        {/* Sound toggle pill */}
+        <button
+          onClick={toggleSound}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '5px 8px',
+            background: soundEnabled ? 'rgba(34, 197, 94, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+            border: `1px solid ${soundEnabled ? 'rgba(34, 197, 94, 0.25)' : '#1e1e40'}`,
+            borderRadius: 6,
+            marginBottom: 10,
+            cursor: 'pointer',
+            fontSize: 11,
+            color: soundEnabled ? '#4ade80' : '#8892a8',
+            fontFamily: 'inherit',
+          }}
+        >
+          <span>{soundEnabled ? '🔊 Звуковые алерты' : '🔇 Звук выключен'}</span>
+          <span style={{
+            fontSize: 9,
+            fontWeight: 700,
+            padding: '1px 4px',
+            borderRadius: 3,
+            background: soundEnabled ? '#22c55e' : '#334155',
+            color: '#fff',
+          }}>
+            {soundEnabled ? 'ON' : 'OFF'}
+          </span>
+        </button>
+
         {user ? (
           <>
             <div style={{
@@ -449,75 +627,5 @@ export default function Sidebar() {
       </div>
       </div>
     </>
-  )
-}
-
-function TopLink({ href, icon, label, active }) {
-  const [hover, setHover] = useState(false)
-  return (
-    <Link
-      href={href}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '7px 10px',
-        color: active ? '#a5b4fc' : hover ? '#c4cfe0' : '#8892a8',
-        background: active ? 'rgba(99,102,241,0.12)' : hover ? 'rgba(255,255,255,0.04)' : 'none',
-        borderLeft: `2px solid ${active ? '#6366f1' : 'transparent'}`,
-        fontSize: 13,
-        fontWeight: 600,
-        textDecoration: 'none',
-        borderRadius: '0 7px 7px 0',
-        transition: 'color 0.12s, background 0.12s',
-        marginBottom: 1,
-      }}
-    >
-      <span style={{ fontSize: 13, opacity: 0.8 }}>{icon}</span>
-      <span>{label}</span>
-    </Link>
-  )
-}
-
-function SectionHeader({ icon, label, isOpen, active, onClick }) {
-  const [hover, setHover] = useState(false)
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        width: '100%',
-        padding: '6px 10px',
-        background: hover ? 'rgba(255,255,255,0.04)' : 'none',
-        border: 'none',
-        borderLeft: '2px solid transparent',
-        cursor: 'pointer',
-        color: active ? '#a5b4fc' : hover ? '#8892a8' : '#505878',
-        fontSize: 12,
-        fontWeight: 700,
-        textAlign: 'left',
-        borderRadius: '0 7px 7px 0',
-        marginBottom: 1,
-        fontFamily: 'inherit',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-      }}
-    >
-      <span style={{ fontSize: 11, opacity: 0.7 }}>{icon}</span>
-      <span style={{ flex: 1 }}>{label}</span>
-      <span style={{
-        fontSize: 8,
-        color: '#3a4070',
-        transition: 'transform 0.18s',
-        transform: isOpen ? 'rotate(90deg)' : 'none',
-        display: 'inline-block',
-      }}>▶</span>
-    </button>
   )
 }
