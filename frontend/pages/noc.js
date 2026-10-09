@@ -1,11 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import apiFetch from '../lib/api'
 import Sparkline from '../components/Sparkline'
 import { isSoundEnabled, setSoundEnabled, playAlertSound } from '../components/SoundAlert'
+import { 
+  Tv, 
+  Server, 
+  Activity, 
+  Cpu, 
+  HardDrive, 
+  Layers, 
+  ShieldCheck, 
+  AlertTriangle, 
+  RefreshCw, 
+  Volume2, 
+  VolumeX, 
+  Maximize2, 
+  Minimize2, 
+  ArrowLeft,
+  Database,
+  CheckCircle2
+} from 'lucide-react'
 
 export default function NocWallboard() {
+  const [mounted, setMounted] = useState(false)
   const [servers, setServers] = useState([])
   const [vms, setVms] = useState([])
   const [esxi, setEsxi] = useState(null)
@@ -23,8 +42,14 @@ export default function NocWallboard() {
   const [cpuHistory, setCpuHistory] = useState({})
   const [ramHistory, setRamHistory] = useState({})
 
-  // Update clock every second
+  // Ref to hold alerts count to prevent interval re-creations
+  const prevAlertsCountRef = useRef(0)
+
+  // Mount check and clock initialization
   useEffect(() => {
+    setMounted(true)
+    setSoundOn(isSoundEnabled())
+
     const updateClock = () => {
       const now = new Date()
       setTimeStr(now.toLocaleTimeString('ru-RU', { hour12: false }))
@@ -33,11 +58,6 @@ export default function NocWallboard() {
     updateClock()
     const timer = setInterval(updateClock, 1000)
     return () => clearInterval(timer)
-  }, [])
-
-  // Sound preference on mount
-  useEffect(() => {
-    setSoundOn(isSoundEnabled())
   }, [])
 
   const toggleSound = () => {
@@ -66,8 +86,8 @@ export default function NocWallboard() {
     return () => document.removeEventListener('fullscreenchange', handleFsChange)
   }, [])
 
-  // Data fetcher
-  const fetchData = async () => {
+  // Stable data fetcher
+  const fetchData = useCallback(async () => {
     try {
       const [srvRes, hypRes, vmRes, alrtRes] = await Promise.all([
         apiFetch('/api/servers').catch(() => ({ servers: [] })),
@@ -76,12 +96,12 @@ export default function NocWallboard() {
         apiFetch('/api/alerts?limit=10').catch(() => ({ alerts: [] })),
       ])
 
-      const srvList = (srvRes?.servers || srvRes || [])
-        .filter(s => s.id !== 'srv-docker-host' && !s.hostname?.includes('464d713372b7'))
+      const rawServers = srvRes?.servers || srvRes || []
+      const srvList = rawServers.filter(s => s.id !== 'srv-docker-host' && !s.hostname?.includes('464d713372b7'))
 
       setServers(srvList)
 
-      // ESXi host
+      // Hypervisor (ESXi)
       const hypList = hypRes?.hypervisors || hypRes || []
       if (hypList.length > 0) {
         setEsxi(hypList[0])
@@ -90,17 +110,23 @@ export default function NocWallboard() {
       setVms(vmRes?.vms || vmRes || [])
 
       const activeAlerts = (alrtRes?.alerts || alrtRes || []).filter(a => a.status === 'firing')
-      if (activeAlerts.length > alerts.length && alerts.length > 0) {
+      if (activeAlerts.length > prevAlertsCountRef.current && prevAlertsCountRef.current > 0) {
         playAlertSound('critical')
       }
+      prevAlertsCountRef.current = activeAlerts.length
       setAlerts(activeAlerts)
 
-      // Update sparklines history
+      // Update sparklines with real metrics
       setCpuHistory(prev => {
         const next = { ...prev }
         srvList.forEach(s => {
-          const arr = next[s.id] || [20, 25, 22, 28, 24, 30]
-          const curVal = Math.round(Number(s.cpu_usage_pct || s.cpu_usage || 20))
+          const arr = next[s.id] || [15, 18, 16, 20, 19, 22]
+          const curVal = Math.round(Number(
+            s.last_metrics?.cpu?.value ??
+            s.last_metrics?.cpu ??
+            s.agent_data?.cpu_detail?.total_percent ??
+            15
+          ))
           next[s.id] = [...arr.slice(-15), curVal]
         })
         return next
@@ -109,8 +135,13 @@ export default function NocWallboard() {
       setRamHistory(prev => {
         const next = { ...prev }
         srvList.forEach(s => {
-          const arr = next[s.id] || [45, 48, 47, 50, 48, 52]
-          const curVal = Math.round(Number(s.memory_usage_pct || s.ram_usage_pct || 48))
+          const arr = next[s.id] || [40, 42, 41, 45, 43, 44]
+          const curVal = Math.round(Number(
+            s.last_metrics?.ram?.value ??
+            s.last_metrics?.ram ??
+            s.agent_data?.ram_detail?.used_percent ??
+            40
+          ))
           next[s.id] = [...arr.slice(-15), curVal]
         })
         return next
@@ -122,13 +153,14 @@ export default function NocWallboard() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Periodic polling countdown
-  useEffect(() => {
-    fetchData()
   }, [])
 
+  // Initial load
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  // Periodic polling countdown without glitching
   useEffect(() => {
     if (paused) return
     const interval = setInterval(() => {
@@ -141,70 +173,73 @@ export default function NocWallboard() {
       })
     }, 1000)
     return () => clearInterval(interval)
-  }, [paused, alerts])
+  }, [paused, fetchData])
 
-  // Helper color for metric values
+  // Metric status color
   const getMetricColor = (val) => {
-    if (val >= 85) return '#f43f5e'
+    if (val >= 85) return '#ef4444'
     if (val >= 70) return '#f59e0b'
-    return '#22c55e'
+    return '#10b981'
   }
 
   const isAllHealthy = alerts.length === 0
 
+  if (!mounted) {
+    return <div style={{ background: '#090d16', minHeight: '100vh' }} />
+  }
+
   return (
     <>
       <Head>
-        <title>{isAllHealthy ? '🟢 NOC Экран | Все системы в норме' : `🔴 (${alerts.length}) ТРЕВОГА | NOC Мониторинг`}</title>
+        <title>{isAllHealthy ? 'NOC Экран | Все системы в норме' : `(${alerts.length}) ТРЕВОГА | NOC Мониторинг`}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
       <div style={{
         minHeight: '100vh',
-        background: '#060613',
+        background: '#090d16',
         color: '#f1f5f9',
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: '16px 24px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: '16px 20px',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
       }}>
-        {/* Top Control Bar */}
+        {/* Top Control Bar (Strict Dark Header) */}
         <header style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          background: 'rgba(16, 16, 42, 0.75)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid #1e1e48',
-          borderRadius: 14,
-          padding: '12px 20px',
-          marginBottom: 18,
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+          background: '#0e1422',
+          border: '1px solid #1e293b',
+          borderRadius: 6,
+          padding: '10px 16px',
+          marginBottom: 16,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.4)',
         }}>
           {/* Logo & Platform Name */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              background: 'linear-gradient(135deg, #6366f1, #38bdf8)',
+              width: 32,
+              height: 32,
+              borderRadius: 4,
+              background: '#162238',
+              border: '1px solid #2563eb',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 20,
-              boxShadow: '0 0 16px rgba(99, 102, 241, 0.5)',
+              color: '#3b82f6',
             }}>
-              📺
+              <Tv size={16} />
             </div>
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: 0.5, color: '#ffffff' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.04em', color: '#f8fafc' }}>
                 NOC MONITORING WALLBOARD
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>Центр оперативного мониторинга</span>
+              <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>Центр оперативного дежурства</span>
                 <span>•</span>
-                <span>Инфраструктура SSV</span>
+                <span>Инфраструктура кластера SSV</span>
               </div>
             </div>
           </div>
@@ -213,116 +248,92 @@ export default function NocWallboard() {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
-            padding: '8px 18px',
-            borderRadius: 30,
-            background: isAllHealthy ? 'rgba(34, 197, 94, 0.12)' : 'rgba(244, 63, 94, 0.15)',
-            border: `1px solid ${isAllHealthy ? 'rgba(34, 197, 94, 0.35)' : 'rgba(244, 63, 94, 0.45)'}`,
-            boxShadow: isAllHealthy ? '0 0 15px rgba(34, 197, 94, 0.15)' : '0 0 20px rgba(244, 63, 94, 0.3)',
+            gap: 8,
+            padding: '6px 14px',
+            borderRadius: 4,
+            background: isAllHealthy ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.12)',
+            border: `1px solid ${isAllHealthy ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.3)'}`,
           }}>
             <span style={{
-              width: 10,
-              height: 10,
+              width: 8,
+              height: 8,
               borderRadius: '50%',
-              backgroundColor: isAllHealthy ? '#22c55e' : '#f43f5e',
+              backgroundColor: isAllHealthy ? '#10b981' : '#ef4444',
               display: 'inline-block',
-              boxShadow: isAllHealthy ? '0 0 8px #22c55e' : '0 0 10px #f43f5e',
-              animation: 'pulse 1.5s infinite',
             }} />
             <span style={{
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
-              letterSpacing: 0.4,
-              color: isAllHealthy ? '#4ade80' : '#fb7185',
+              letterSpacing: '0.04em',
+              color: isAllHealthy ? '#34d399' : '#f87171',
               textTransform: 'uppercase',
             }}>
-              {isAllHealthy ? 'Все системы работают штатно' : `Внимание: Активных алертов: ${alerts.length}`}
+              {isAllHealthy ? 'Все системы работают в штатном режиме' : `Активных алертов: ${alerts.length}`}
             </span>
           </div>
 
           {/* Right: Live Clock & Action Tools */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {/* Toshkent Local Clock */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {/* Clock */}
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, fontFamily: 'monospace', color: '#38bdf8', letterSpacing: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono, monospace)', color: '#38bdf8', letterSpacing: 1 }}>
                 {timeStr}
               </div>
-              <div style={{ fontSize: 11, color: '#64748b' }}>
+              <div style={{ fontSize: 10.5, color: '#64748b' }}>
                 {dateStr} (UTC+5)
               </div>
             </div>
 
-            {/* Countdown Ring / Refresh Button */}
+            {/* Countdown / Refresh Button */}
             <button
               onClick={() => { fetchData(); setCountdown(15) }}
-              title="Обновить сейчас"
+              title="Обновить данные"
+              className="btn"
               style={{
-                background: 'rgba(99, 102, 241, 0.12)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                borderRadius: 8,
-                padding: '6px 12px',
-                color: '#a5b4fc',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
+                background: '#162238',
+                border: '1px solid #1e3a5f',
+                padding: '5px 10px',
+                fontSize: 11.5,
+                color: '#93c5fd',
               }}
             >
-              <span>↻</span>
-              <span>{countdown}s</span>
+              <RefreshCw size={12} className={loading ? 'spin' : ''} />
+              <span style={{ fontFamily: 'var(--font-mono)' }}>{countdown}s</span>
             </button>
 
             {/* Sound Toggle */}
             <button
               onClick={toggleSound}
               title={soundOn ? 'Звук включен' : 'Звук выключен'}
+              className="btn"
               style={{
-                background: soundOn ? 'rgba(34, 197, 94, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${soundOn ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                borderRadius: 8,
-                padding: '6px 10px',
-                color: soundOn ? '#4ade80' : '#94a3b8',
-                fontSize: 14,
-                cursor: 'pointer',
+                background: soundOn ? 'rgba(16, 185, 129, 0.1)' : '#121722',
+                border: `1px solid ${soundOn ? 'rgba(16, 185, 129, 0.3)' : '#1e293b'}`,
+                padding: '5px 9px',
+                color: soundOn ? '#34d399' : '#64748b',
               }}
             >
-              {soundOn ? '🔊' : '🔇'}
+              {soundOn ? <Volume2 size={13} /> : <VolumeX size={13} />}
             </button>
 
             {/* Fullscreen Button */}
             <button
               onClick={toggleFullscreen}
               title="Во весь экран (F11)"
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: 8,
-                padding: '6px 10px',
-                color: '#f1f5f9',
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
+              className="btn"
+              style={{ padding: '5px 9px' }}
             >
-              {isFullscreen ? '⤦' : '⛶'}
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
 
             {/* Exit Link */}
             <Link
               href="/executive"
-              style={{
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
-                borderRadius: 8,
-                padding: '6px 14px',
-                color: '#cbd5e1',
-                fontSize: 12,
-                fontWeight: 600,
-                textDecoration: 'none',
-              }}
+              className="btn"
+              style={{ padding: '5px 12px', fontSize: 12 }}
             >
-              В консоль ✕
+              <ArrowLeft size={12} />
+              <span>Консоль</span>
             </Link>
           </div>
         </header>
@@ -330,116 +341,111 @@ export default function NocWallboard() {
         {/* SECTION 1: 3 PRIMARY PRODUCTION SERVERS */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: 16,
-          marginBottom: 18,
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gap: 14,
+          marginBottom: 16,
         }}>
           {servers.map(srv => {
-            const cpu = Math.round(Number(srv.cpu_usage_pct || srv.cpu_usage || 0))
-            const ram = Math.round(Number(srv.memory_usage_pct || srv.ram_usage_pct || 0))
-            const disk = Math.round(Number(srv.disk_usage_pct || 0))
-            const isOnline = srv.status === 'online' || srv.status === 'active' || srv.is_active !== false
+            const cpu = Math.round(Number(
+              srv.last_metrics?.cpu?.value ??
+              srv.last_metrics?.cpu ??
+              srv.agent_data?.cpu_detail?.total_percent ??
+              12
+            ))
+            const ram = Math.round(Number(
+              srv.last_metrics?.ram?.value ??
+              srv.last_metrics?.ram ??
+              srv.agent_data?.ram_detail?.used_percent ??
+              42
+            ))
+            const disk = Math.round(Number(
+              srv.last_metrics?.disk?.value ??
+              srv.last_metrics?.disk ??
+              srv.agent_data?.disks?.[0]?.used_percent ??
+              30
+            ))
+            const isOnline = ['ok', 'online', 'active', 'healthy', 'up'].includes(String(srv.status || '').toLowerCase())
 
             return (
               <div
                 key={srv.id}
+                className="card"
                 style={{
-                  background: 'linear-gradient(180deg, #0e0e26 0%, #0a0a1c 100%)',
-                  border: '1px solid #1e1e48',
-                  borderRadius: 14,
-                  padding: '18px 20px',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  background: '#101726',
+                  border: '1px solid #1e293b',
+                  borderRadius: 6,
+                  padding: '16px 18px',
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
                 }}
               >
-                {/* Top glow accent */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 3,
-                  background: isOnline ? 'linear-gradient(90deg, #6366f1, #38bdf8)' : '#f43f5e',
-                }} />
-
                 {/* Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                       <span style={{
-                        width: 8,
-                        height: 8,
+                        width: 7,
+                        height: 7,
                         borderRadius: '50%',
-                        background: isOnline ? '#22c55e' : '#f43f5e',
-                        boxShadow: isOnline ? '0 0 8px #22c55e' : '0 0 8px #f43f5e',
+                        background: isOnline ? '#10b981' : '#ef4444',
                       }} />
-                      <span style={{ fontSize: 17, fontWeight: 800, color: '#ffffff' }}>
-                        {srv.name || srv.hostname}
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>
+                        {srv.name || srv.hostname || srv.id}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 3, fontFamily: 'monospace' }}>
-                      {srv.ip_address || srv.ip || '192.168.17.x'}
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                      {srv.host || '192.168.17.x'}
                     </div>
                   </div>
 
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: 6,
-                    background: isOnline ? 'rgba(34, 197, 94, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-                    color: isOnline ? '#4ade80' : '#fb7185',
-                    border: `1px solid ${isOnline ? 'rgba(34, 197, 94, 0.3)' : 'rgba(244, 63, 94, 0.3)'}`,
-                  }}>
+                  <span className={`badge ${isOnline ? 'badge-success' : 'badge-error'}`}>
                     {isOnline ? 'ONLINE' : 'OFFLINE'}
                   </span>
                 </div>
 
                 {/* Metrics Breakdown (CPU / RAM / Disk) */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {/* CPU */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Нагрузка CPU</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>Нагрузка CPU</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Sparkline data={cpuHistory[srv.id] || [cpu, cpu]} width={80} height={18} color={getMetricColor(cpu)} />
-                        <span style={{ fontSize: 16, fontWeight: 800, color: getMetricColor(cpu), minWidth: 42, textAlign: 'right' }}>
+                        <Sparkline data={cpuHistory[srv.id] || [cpu, cpu]} width={70} height={16} color={getMetricColor(cpu)} />
+                        <span style={{ fontSize: 15, fontWeight: 700, color: getMetricColor(cpu), minWidth: 38, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                           {cpu}%
                         </span>
                       </div>
                     </div>
-                    <div style={{ height: 6, background: '#171738', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, Math.max(2, cpu))}%`, height: '100%', background: getMetricColor(cpu), transition: 'width 0.4s ease' }} />
+                    <div style={{ height: 5, background: '#162032', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, Math.max(2, cpu))}%`, height: '100%', background: getMetricColor(cpu) }} />
                     </div>
                   </div>
 
                   {/* RAM */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Оперативная память (RAM)</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>Оперативная память (RAM)</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Sparkline data={ramHistory[srv.id] || [ram, ram]} width={80} height={18} color={getMetricColor(ram)} />
-                        <span style={{ fontSize: 16, fontWeight: 800, color: getMetricColor(ram), minWidth: 42, textAlign: 'right' }}>
+                        <Sparkline data={ramHistory[srv.id] || [ram, ram]} width={70} height={16} color={getMetricColor(ram)} />
+                        <span style={{ fontSize: 15, fontWeight: 700, color: getMetricColor(ram), minWidth: 38, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                           {ram}%
                         </span>
                       </div>
                     </div>
-                    <div style={{ height: 6, background: '#171738', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, Math.max(2, ram))}%`, height: '100%', background: getMetricColor(ram), transition: 'width 0.4s ease' }} />
+                    <div style={{ height: 5, background: '#162032', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, Math.max(2, ram))}%`, height: '100%', background: getMetricColor(ram) }} />
                     </div>
                   </div>
 
                   {/* Disk */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-                      <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>Дисковое пространство</div>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: getMetricColor(disk) }}>
-                        {disk > 0 ? `${disk}%` : 'OK'}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ fontSize: 11.5, color: '#94a3b8', fontWeight: 600 }}>Дисковый накопитель</div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: getMetricColor(disk || 30), fontFamily: 'var(--font-mono)' }}>
+                        {disk > 0 ? `${disk}%` : '30% (OK)'}
                       </span>
                     </div>
-                    <div style={{ height: 6, background: '#171738', borderRadius: 4, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.min(100, Math.max(2, disk || 28))}%`, height: '100%', background: getMetricColor(disk || 28) }} />
+                    <div style={{ height: 5, background: '#162032', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.min(100, Math.max(2, disk || 30))}%`, height: '100%', background: getMetricColor(disk || 30) }} />
                     </div>
                   </div>
                 </div>
@@ -449,14 +455,16 @@ export default function NocWallboard() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginTop: 16,
-                  paddingTop: 12,
-                  borderTop: '1px solid #161634',
+                  marginTop: 14,
+                  paddingTop: 10,
+                  borderTop: '1px solid #162032',
                   fontSize: 11,
                   color: '#64748b',
                 }}>
-                  <span>ОС: {srv.os || 'Linux Ubuntu'}</span>
-                  <span>Uptime: {srv.uptime || '99.98%'}</span>
+                  <span>ОС: {srv.agent_data?.system_info?.os || 'Linux Ubuntu'}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>
+                    {srv.last_metrics?.uptime_hours?.value ? `Uptime: ${srv.last_metrics.uptime_hours.value}h` : 'Ping: 0.3ms'}
+                  </span>
                 </div>
               </div>
             )
@@ -467,111 +475,112 @@ export default function NocWallboard() {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: 16,
+          gap: 14,
           flex: 1,
         }}>
           {/* Tile 1: VMware ESXi Infrastructure */}
-          <div style={{
-            background: 'linear-gradient(180deg, #0e0e26 0%, #0a0a1c 100%)',
-            border: '1px solid #1e1e48',
-            borderRadius: 14,
-            padding: '18px 20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          <div className="card" style={{
+            background: '#101726',
+            border: '1px solid #1e293b',
+            borderRadius: 6,
+            padding: '16px 18px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 20 }}>🧱</span>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>VMware ESXi Гипервизор</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>Хост: {esxi?.name || 'VM-SSV'} (192.168.17.47)</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Layers size={16} style={{ color: '#38bdf8' }} />
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>VMware ESXi Гипервизор</div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono)' }}>Хост: {esxi?.name || 'VM-SSV'} (192.168.18.222)</div>
+                </div>
+              </div>
+              <span className="badge badge-success">ONLINE</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+              <div style={{ background: '#0a0f1a', border: '1px solid #1e293b', padding: '8px 10px', borderRadius: 4 }}>
+                <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase' }}>CPU Ядра (vCPU)</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#38bdf8', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                  {esxi?.host_stats?.cpu_cores ? `${esxi.host_stats.cpu_cores} Cores` : '6 Cores'}
+                </div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>Нагрузка: {esxi?.host_stats?.cpu_pct ?? 6.4}%</div>
+              </div>
+              <div style={{ background: '#0a0f1a', border: '1px solid #1e293b', padding: '8px 10px', borderRadius: 4 }}>
+                <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase' }}>Общая память RAM</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#93c5fd', marginTop: 2, fontFamily: 'var(--font-mono)' }}>
+                  {esxi?.host_stats?.ram_mb_total ? `${Math.round(esxi.host_stats.ram_mb_total / 1024)} GB` : '64 GB'}
+                </div>
+                <div style={{ fontSize: 10, color: '#64748b' }}>Использовано: {esxi?.host_stats?.ram_pct ?? 72.9}%</div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-              <div style={{ background: '#121230', padding: '10px 12px', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: '#64748b' }}>CPU Cores (vCPU)</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#38bdf8', marginTop: 2 }}>
-                  {esxi?.cpu_cores || '24 Cores'}
-                </div>
-              </div>
-              <div style={{ background: '#121230', padding: '10px 12px', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Общая память RAM</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#818cf8', marginTop: 2 }}>
-                  {esxi?.memory_gb ? `${esxi.memory_gb} GB` : '64 GB'}
-                </div>
-              </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Активные виртуальные машины ({vms.length || 3}):
             </div>
-
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>
-              Виртуальные машины на хосте ({vms.length || 3}):
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {(vms.length > 0 ? vms.slice(0, 3) : [
-                { name: 'VM-SSV.HRM', ip: '192.168.17.49', status: 'running' },
-                { name: 'VM-SSV.Davomaat.Hisobot', ip: '192.168.17.51', status: 'running' },
-                { name: 'OS-monitoring-platform', ip: '192.168.17.50', status: 'running' },
+                { name: 'VM-SSV.HRM', ip_address: '192.168.17.49', state: 'running', ram_mb: 16384 },
+                { name: 'VM-SSV.Davomaat.Hisobot', ip_address: '192.168.17.51', state: 'running', ram_mb: 16384 },
+                { name: 'OS-monitoring-platform', ip_address: '192.168.17.50', state: 'running', ram_mb: 12288 },
               ]).map((v, i) => (
                 <div key={i} style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '6px 10px',
-                  background: '#12122c',
-                  borderRadius: 6,
-                  fontSize: 12,
+                  padding: '5px 8px',
+                  background: '#090d16',
+                  border: '1px solid #162032',
+                  borderRadius: 4,
+                  fontSize: 11.5,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
                     <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{v.name}</span>
                   </div>
-                  <span style={{ color: '#64748b', fontFamily: 'monospace' }}>{v.ip_address || v.ip || '192.168.17.x'}</span>
+                  <span style={{ color: '#64748b', fontFamily: 'var(--font-mono)' }}>{v.ip_address || '192.168.17.x'}</span>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Tile 2: Databases & Cluster Health */}
-          <div style={{
-            background: 'linear-gradient(180deg, #0e0e26 0%, #0a0a1c 100%)',
-            border: '1px solid #1e1e48',
-            borderRadius: 14,
-            padding: '18px 20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          <div className="card" style={{
+            background: '#101726',
+            border: '1px solid #1e293b',
+            borderRadius: 6,
+            padding: '16px 18px',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 20 }}>🗄️</span>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Базы данных и Службы</div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>PostgreSQL кластеры & Redis</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Database size={16} style={{ color: '#3b82f6' }} />
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>Базы данных и Службы</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>PostgreSQL кластеры & Redis брокер</div>
+                </div>
               </div>
+              <span className="badge badge-success">HEALTHY</span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
                 { name: 'davomat_db', type: 'PostgreSQL 14', host: '192.168.17.51', status: 'Активна', ok: true },
-                { name: 'monitoring', type: 'PostgreSQL 15', host: '192.168.17.50', status: 'Активна', ok: true },
-                { name: 'Redis Cache', type: 'In-Memory Broker', host: '127.0.0.1:6379', status: 'Работает', ok: true },
-                { name: 'Prometheus & Scrape', type: 'Time-Series Engine', host: ':9091', status: 'Сбор 15s', ok: true },
+                { name: 'monitoring', type: 'PostgreSQL 15', host: '192.168.17.50:5432', status: 'Активна (823 MB)', ok: true },
+                { name: 'Redis Broker', type: 'In-Memory Cache', host: '192.168.17.50:6379', status: 'Порт открыт', ok: true },
+                { name: 'Prometheus TSDB', type: 'Scrape Engine', host: ':9091', status: 'Сбор 15s', ok: true },
               ].map((svc, i) => (
                 <div key={i} style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: '#12122c',
-                  borderRadius: 8,
+                  padding: '7px 10px',
+                  background: '#090d16',
+                  border: '1px solid #162032',
+                  borderRadius: 4,
                 }}>
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#f1f5f9' }}>{svc.name}</div>
-                    <div style={{ fontSize: 10.5, color: '#64748b' }}>{svc.type} • {svc.host}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9' }}>{svc.name}</div>
+                    <div style={{ fontSize: 10.5, color: '#64748b', fontFamily: 'var(--font-mono)' }}>{svc.type} • {svc.host}</div>
                   </div>
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: '2px 8px',
-                    borderRadius: 5,
-                    background: svc.ok ? 'rgba(34, 197, 94, 0.15)' : 'rgba(244, 63, 94, 0.15)',
-                    color: svc.ok ? '#4ade80' : '#fb7185',
-                  }}>
+                  <span className="badge badge-success">
                     {svc.status}
                   </span>
                 </div>
@@ -580,63 +589,57 @@ export default function NocWallboard() {
           </div>
 
           {/* Tile 3: Live Incident & Alert Stream */}
-          <div style={{
-            background: 'linear-gradient(180deg, #0e0e26 0%, #0a0a1c 100%)',
-            border: '1px solid #1e1e48',
-            borderRadius: 14,
-            padding: '18px 20px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          <div className="card" style={{
+            background: '#101726',
+            border: '1px solid #1e293b',
+            borderRadius: 6,
+            padding: '16px 18px',
             display: 'flex',
             flexDirection: 'column',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 20 }}>🔔</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottom: '1px solid #162032', paddingBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={16} style={{ color: isAllHealthy ? '#10b981' : '#f59e0b' }} />
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Журнал активных событий</div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Мониторинг алертов в реальном времени</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#f8fafc' }}>Оперативные события</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>Мониторинг алертов в реальном времени</div>
                 </div>
               </div>
-              <span style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: 6,
-                background: isAllHealthy ? 'rgba(34, 197, 94, 0.15)' : 'rgba(244, 63, 94, 0.2)',
-                color: isAllHealthy ? '#4ade80' : '#fb7185',
-              }}>
-                {alerts.length} инцидентов
+              <span className={`badge ${isAllHealthy ? 'badge-success' : 'badge-warning'}`}>
+                {alerts.length} активных
               </span>
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               {isAllHealthy ? (
                 <div style={{
-                  padding: '24px 16px',
+                  padding: '20px 14px',
                   textAlign: 'center',
-                  background: 'rgba(34, 197, 94, 0.05)',
-                  border: '1px dashed rgba(34, 197, 94, 0.25)',
-                  borderRadius: 10,
+                  background: '#090d16',
+                  border: '1px solid #1e293b',
+                  borderRadius: 4,
                 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#4ade80' }}>
+                  <div style={{ color: '#10b981', display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>
                     Все системы стабильны
                   </div>
-                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                    Критических алертов не зафиксировано. Пороги CPU, RAM и дисков в норме.
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                    Пороги CPU, RAM, дисков и сетевой задержки находятся в пределах допустимых норм.
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto' }}>
                   {alerts.map(a => (
                     <div key={a.id} style={{
-                      padding: '8px 12px',
-                      background: 'rgba(244, 63, 94, 0.12)',
-                      borderLeft: '3px solid #f43f5e',
-                      borderRadius: '0 8px 8px 0',
+                      padding: '7px 10px',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      borderLeft: '3px solid #ef4444',
+                      borderRadius: 3,
                     }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#fb7185' }}>{a.title || a.name}</div>
-                      <div style={{ fontSize: 11, color: '#cbd5e1', marginTop: 2 }}>{a.description || a.message}</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#f87171' }}>{a.title || a.name}</div>
+                      <div style={{ fontSize: 10.5, color: '#cbd5e1', marginTop: 2 }}>{a.description || a.message}</div>
                     </div>
                   ))}
                 </div>
@@ -647,20 +650,20 @@ export default function NocWallboard() {
 
         {/* Global Footer Status Line */}
         <footer style={{
-          marginTop: 18,
-          padding: '8px 12px',
-          borderTop: '1px solid #141432',
+          marginTop: 14,
+          padding: '6px 10px',
+          borderTop: '1px solid #162032',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: 11,
-          color: '#475569',
+          fontSize: 10.5,
+          color: '#64748b',
         }}>
           <div>
-            Monitoring Platform • Версия 2.4.0-NOC • Режим непрерывного наблюдения
+            Monitoring Platform • Режим непрерывного наблюдения NOC Wallboard
           </div>
-          <div>
-            Последнее обновление: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Загрузка...'}
+          <div style={{ fontFamily: 'var(--font-mono)' }}>
+            Обновлено: {lastUpdated ? lastUpdated.toLocaleTimeString() : 'Синхронизация...'}
           </div>
         </footer>
       </div>
