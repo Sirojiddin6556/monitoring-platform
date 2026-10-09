@@ -1216,6 +1216,10 @@ def _release_background_bot_lock() -> None:
 async def start_bot_background():
     """Запуск бота как фоновой задачи (вызывается из main.py startup_event)"""
     global _background_bot_instance
+    if os.getenv('TELEGRAM_BOT_POLLING', 'false').lower() not in ('1', 'true', 'yes'):
+        logger.info("ℹ️ Telegram bot polling отключен (уведомления отправляются напрямую через HTTP API).")
+        return None
+
     if not _acquire_background_bot_lock():
         logger.info("ℹ️ Telegram bot: polling уже запущен в другом процессе — пропуск")
         return None
