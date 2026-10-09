@@ -20,7 +20,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    # Порт не публикуется наружу — доступен только внутри Docker сети
+    ports:
+      - "6379:6379"
+    # Порт опубликован для доступа на хосте
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

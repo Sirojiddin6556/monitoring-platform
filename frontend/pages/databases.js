@@ -69,7 +69,7 @@ function StatCard({title, value, sub, icon, color='#6366f1'}) {
 function getDbType(image = '', name = '') {
   const s = (image + ' ' + name).toLowerCase()
   if (s.includes('postgres') || s.includes('pgsql')) return { type: 'PostgreSQL', icon: '🐘', color: '#336791' }
-  if (s.includes('redis') || s.includes('valkey')) return { type: 'Redis', icon: '🔴', color: '#dc2626' }
+  if (s.includes('redis') || s.includes('valkey')) return { type: 'Redis', icon: '⚡', color: '#e11d48' }
   if (s.includes('mysql')) return { type: 'MySQL', icon: '🐬', color: '#f59e0b' }
   if (s.includes('mariadb')) return { type: 'MariaDB', icon: '🦭', color: '#0284c7' }
   if (s.includes('mongo')) return { type: 'MongoDB', icon: '🍃', color: '#16a34a' }
@@ -308,7 +308,7 @@ export default function Databases() {
             <StatCard title="Всего СУБД" value={totalDbs} sub="Экземпляров в системе" icon="🗄️" color="#6366f1"/>
             <StatCard title="Активных" value={runningDbs} sub={`${runningDbs} из ${totalDbs} работают`} icon="🟢" color="#4ade80"/>
             <StatCard title="PostgreSQL" value={pgDbs} sub="Реляционные БД" icon="🐘" color="#38bdf8"/>
-            <StatCard title="Redis In-Memory" value={redisDbs} sub="Кэш и очереди" icon="🔴" color="#f87171"/>
+            <StatCard title="Redis In-Memory" value={redisDbs} sub="Кэш и брокер очереди" icon="⚡" color="#38bdf8"/>
           </div>
 
           {/* Controls: Search & Type filters */}
