@@ -261,8 +261,19 @@ API_MONITOR_CURRENT: dict = {}
 DB_WRITE_LOCK = None
 
 
-def _get_db_write_lock() -> asyncio.Lock:
+class _NoOpAsyncLock:
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+_NOOP_LOCK = _NoOpAsyncLock()
+
+
+def _get_db_write_lock():
     global DB_WRITE_LOCK
+    if not getattr(db, '_IS_SQLITE', True):
+        return _NOOP_LOCK
     if DB_WRITE_LOCK is None:
         DB_WRITE_LOCK = asyncio.Lock()
     return DB_WRITE_LOCK
@@ -1398,7 +1409,7 @@ async def background_server_pinger():
         try:
             if APP_SETTINGS.get('monitoring_enabled', 'true') == 'true' and APP_SETTINGS.get('ping_enabled', 'true') == 'true':
                 max_metrics = int(APP_SETTINGS.get('max_metrics_store', '1000'))
-                agent_fresh_ttl = int(APP_SETTINGS.get('agent_fresh_ttl', '20'))
+                agent_fresh_ttl = int(APP_SETTINGS.get('agent_fresh_ttl', '90'))
                 ts = int(time.time())
                 
                 # Локальные метрики (fallback для серверов без агента)
@@ -1473,19 +1484,19 @@ async def background_server_pinger():
                         source_label = 'ping_only'
 
                     else:
-                        # Agent mode: проверить, есть ли свежие метрики от агента (не старше 120 сек)
+                        # Agent mode: проверить, есть ли свежие метрики от агента (не старше 90 сек)
                         agent_data = AGENT_METRICS.get(sid)
                         agent_fresh = agent_data and (ts - agent_data.get('timestamp', 0)) < agent_fresh_ttl
                         
                         if agent_fresh:
-                            # Использовать реальные метрики от удалённого агента
-                            all_metrics = dict(agent_data['metrics'])
-                            all_metrics['ping'] = {'value': ping_ms, 'unit': 'ms'}
-                            source_label = 'agent'
-                            status_value = 'ok'
-                            is_up = True
+                            # Обновляем ping latency в кэше агента
+                            if agent_data and 'metrics' in agent_data:
+                                agent_data['metrics']['ping'] = {'value': ping_ms, 'unit': 'ms'}
+                            # Агент сам отправляет полные метрики (с контейнерами, дисками, процессами).
+                            # Не перезаписываем их урезанным синтетическим объектом!
+                            continue
                         else:
-                            # Агент не присылал свежие данные: считаем агент оффлайн.
+                            # Агент не присылал свежие данные > 90 сек: считаем агент оффлайн.
                             all_metrics = _make_zero_metrics(ping_ms)
                             source_label = 'agent_stale'
                             status_value = 'down'
@@ -1561,23 +1572,36 @@ async def api_monitoring_check_now(current_user: dict = Depends(get_admin_user))
 
 _AGENT_DIR = _os.path.normpath(_os.path.join(_os.path.dirname(__file__), '..', '..', 'agent'))
 _AGENT_ALLOWED = {'install.ps1', 'install.sh', 'MonitoringAgent.exe', 'MonitoringAgentInstaller.exe',
-                  'monitoring-agent-linux-amd64', 'monitoring-agent-linux-arm64', 'monitoring-agent-linux-arm'}
+                  'monitoring-agent-linux-amd64', 'monitoring-agent-linux-arm64', 'monitoring-agent-linux-arm',
+                  'monitoring-agent', 'VERSION', 'update.sh', 'update.ps1'}
+
+PENDING_AGENT_UPGRADES = set()
+
+def get_latest_agent_version() -> str:
+    ver_path = _os.path.join(_AGENT_DIR, 'VERSION')
+    try:
+        with open(ver_path, 'r') as f:
+            return f.read().strip()
+    except Exception:
+        return '3.0.0'
+
+@app.get('/api/agent/version')
+@app.get('/agent/version')
+async def get_agent_version_endpoint():
+    """Публичный endpoint для быстрой проверки версии агента."""
+    ver = get_latest_agent_version()
+    return {'version': ver}
 
 @app.get('/api/agent/info')
 async def agent_download_info(current_user: dict = Depends(get_current_user)):
     """Возвращает версию агента и INGEST_API_KEY для wizard установки."""
-    version = '—'
-    ver_path = _os.path.join(_AGENT_DIR, 'VERSION')
-    try:
-        with open(ver_path, 'r') as f:
-            version = f.read().strip()
-    except Exception:
-        pass
+    version = get_latest_agent_version()
     available = [f for f in _AGENT_ALLOWED if _os.path.exists(_os.path.join(_AGENT_DIR, f))]
     return {
         'version': version,
         'ingest_api_key': INGEST_API_KEY,
         'available_files': available,
+        'pending_upgrades': list(PENDING_AGENT_UPGRADES),
     }
 
 
@@ -1614,7 +1638,8 @@ async def revoke_agent_key(key_id: int, current_user: dict = Depends(get_admin_u
     return {'message': 'revoked'}
 
 
-@app.get('/api/agent/download/{filename}')
+@app.api_route('/api/agent/download/{filename}', methods=['GET', 'HEAD'])
+@app.api_route('/agent/{filename}', methods=['GET', 'HEAD'])
 async def download_agent_file(filename: str):
     """Скачать установщик или бинарь агента (публичный endpoint — файлы не содержат секретов)."""
     from fastapi.responses import FileResponse as _FileResponse
@@ -1624,9 +1649,95 @@ async def download_agent_file(filename: str):
     if not _os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f'{filename} not found on server')
     media = 'application/octet-stream'
-    if filename.endswith('.ps1') or filename.endswith('.sh'):
+    if filename.endswith('.ps1') or filename.endswith('.sh') or filename == 'VERSION':
         media = 'text/plain; charset=utf-8'
     return _FileResponse(path=file_path, filename=filename, media_type=media)
+
+
+@app.post('/api/servers/{server_id}/upgrade-agent')
+async def trigger_agent_upgrade(server_id: str, request: Request, current_user: dict = Depends(get_current_user)):
+    """Инициирует процедуру обновления агента на сервере:
+    1. Если сервер локальный или совпадает с хостом мониторинга — запускает локальное обновление.
+    2. Если заданы SSH реквизиты — запускает удаленное обновление по SSH.
+    3. Добавляет сервер в очередь PENDING_AGENT_UPGRADES, чтобы агент обновился при следующем check-in (15с).
+    """
+    async with db.get_session() as session:
+        server = await session.get(ServerModel, server_id)
+        if not server:
+            raise HTTPException(status_code=404, detail='Server not found')
+
+    cur_version = get_latest_agent_version()
+    executed_ssh = False
+    ssh_output = None
+
+    # Проверка на локальный сервер
+    is_local = server_id in ('Monitoring-platform', 'srv-docker-host') or (server and server.host in ('127.0.0.1', 'localhost', '192.168.17.50'))
+
+    if is_local:
+        try:
+            cmd = "/opt/monitoring-platform/agent/update.sh"
+            if _os.path.exists(cmd):
+                proc = await asyncio.create_subprocess_shell(
+                    f"sudo {cmd}",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+                executed_ssh = True
+                ssh_output = stdout.decode() if stdout else stderr.decode()
+        except Exception as e:
+            _logger.warning(f"Local agent update execution failed: {e}")
+    elif server and server.ssh_user and (server.ssh_password or server.ssh_key_path):
+        try:
+            import asyncssh
+            ssh_pass = decrypt_field(server.ssh_password)
+            options = {
+                'host': server.host,
+                'port': server.ssh_port or 22,
+                'username': server.ssh_user,
+                'known_hosts': None,
+            }
+            if ssh_pass:
+                options['password'] = ssh_pass
+            if server.ssh_key_path:
+                options['client_keys'] = [server.ssh_key_path]
+
+            update_cmd = "curl -sSf http://192.168.17.50:9000/agent/update.sh | sudo bash"
+            async with asyncssh.connect(**options) as conn:
+                res = await conn.run(update_cmd, timeout=45)
+                ssh_output = res.stdout or res.stderr
+                executed_ssh = True
+        except Exception as e:
+            _logger.warning(f"SSH agent upgrade failed for {server_id}: {e}")
+
+    # Добавляем в очередь ожидания обновления через протокол метрик
+    PENDING_AGENT_UPGRADES.add(server_id)
+
+    return {
+        'status': 'ok',
+        'server_id': server_id,
+        'target_version': cur_version,
+        'executed_immediately': executed_ssh,
+        'details': (ssh_output or '').strip(),
+        'message': f'Команда на обновление до v{cur_version} отправлена агенту.'
+    }
+
+
+@app.post('/api/agent/upgrade-all')
+async def trigger_upgrade_all(current_user: dict = Depends(get_admin_user)):
+    """Планирует обновление агента для всех зарегистрированных серверов."""
+    cur_version = get_latest_agent_version()
+    async with db.get_session() as session:
+        res = await session.execute(select(ServerModel))
+        all_servers = res.scalars().all()
+        for s in all_servers:
+            PENDING_AGENT_UPGRADES.add(s.id)
+    return {
+        'status': 'ok',
+        'target_version': cur_version,
+        'count': len(PENDING_AGENT_UPGRADES),
+        'message': f'Обновление до v{cur_version} запланировано для всех серверов'
+    }
 
 
 # --- Resources endpoints for UI tabs ---
@@ -1671,7 +1782,7 @@ async def list_servers(request: Request, current_user: dict = Depends(get_curren
     
     servers_out = []
     now_ts = int(time.time())
-    agent_fresh_ttl = int(APP_SETTINGS.get('agent_fresh_ttl', '20'))
+    agent_fresh_ttl = int(APP_SETTINGS.get('agent_fresh_ttl', '90'))
     for s in SERVERS:
         oid = s.get('org_id') or server_org_map.get(s['id'])
         # Фильтр по организации: не-админы видят только серверы своих организаций
@@ -3747,7 +3858,20 @@ async def all_vms(current_user: dict = Depends(get_admin_user)):
             vm_copy['source_name'] = sid
             # Preserve actual VM type reported by agent; fall back to 'hyperv' for legacy agents
             vm_type = (vm_copy.get('type') or '').lower()
-            vm_copy['hv_type'] = 'vmware' if 'vmware' in vm_type else 'virtualbox' if 'virtualbox' in vm_type else 'hyperv'
+            if 'vmware' in vm_type:
+                vm_copy['hv_type'] = 'vmware'
+            elif 'virtualbox' in vm_type:
+                vm_copy['hv_type'] = 'virtualbox'
+            elif 'qemu' in vm_type or 'kvm' in vm_type:
+                vm_copy['hv_type'] = 'qemu'
+            elif 'proxmox' in vm_type:
+                vm_copy['hv_type'] = 'proxmox'
+            elif 'lxc' in vm_type:
+                vm_copy['hv_type'] = 'lxc'
+            elif 'hyperv' in vm_type:
+                vm_copy['hv_type'] = 'hyperv'
+            else:
+                vm_copy['hv_type'] = vm_type or 'vm'
             all_vms_list.append(vm_copy)
     
     # Из зарегистрированных гипервизоров (кэш)

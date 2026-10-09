@@ -221,6 +221,7 @@ export default function Servers() {
   // ── Agent install modal ──────────────────────────────────────────────────────
   const [showModal, setShowModal] = useState(false)
   const [modalTab, setModalTab] = useState('agent')
+  const [upgradingAgentId, setUpgradingAgentId] = useState(null)
   const [agentPlatform, setAgentPlatform] = useState('windows')
   const [agentForm, setAgentForm] = useState({serverId:'', name:'', host:'', interval:'15'})
   const [agentToken, setAgentToken] = useState('')
@@ -496,6 +497,32 @@ export default function Servers() {
       setSelectedAgentKeys(prev => prev.map(key => key.id === keyId ? { ...key, is_active: false } : key))
     } catch (e) {
       alert('Ошибка отзыва ключа: ' + e.message)
+    }
+  }
+
+  async function handleUpgradeAgent(serverId) {
+    if (!serverId) return
+    if (!confirm(`Запустить обновление агента на сервере ${serverId}?`)) return
+    setUpgradingAgentId(serverId)
+    try {
+      const res = await apiFetch(`/api/servers/${serverId}/upgrade-agent`, { method: 'POST' })
+      alert(`[+] ${res.message || 'Обновление запущено!'}\nЦелевая версия: v${res.target_version || ''}${res.details ? '\n\nЛог:\n' + res.details : ''}`)
+      await loadServers()
+    } catch (e) {
+      alert('Ошибка обновления агента: ' + (e.message || e))
+    } finally {
+      setUpgradingAgentId(null)
+    }
+  }
+
+  async function handleUpgradeAllAgents() {
+    if (!confirm('Запланировать обновление агентов для всех серверов?')) return
+    try {
+      const res = await apiFetch('/api/agent/upgrade-all', { method: 'POST' })
+      alert(`[+] ${res.message || 'Обновление запланировано!'}\nВсего серверов: ${res.count || 0}`)
+      await loadServers()
+    } catch (e) {
+      alert('Ошибка: ' + (e.message || e))
     }
   }
 
@@ -1149,11 +1176,23 @@ export default function Servers() {
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div><h2 style={{margin:0,fontSize:20}}>{selServer?.name}</h2><span style={{fontSize:12,color:'#9aa4b2'}}>{selServer?.host} · {selServer?.id}</span></div>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
-                    {selServer?.monitor_type === 'agent' && (
+                    {selServer?.monitor_type === 'agent' && (<>
+                      {agentData?.agent_version && (
+                        <span title="Версия агента на этом сервере" style={{fontSize:11,padding:'3px 8px',borderRadius:6,background:'#22c55e18',color:'#22c55e',border:'1px solid #22c55e30',fontWeight:600}}>
+                          v{agentData.agent_version}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => handleUpgradeAgent(selServer.id)}
+                        disabled={upgradingAgentId === selServer.id}
+                        title="Обновить агент до актуальной версии"
+                        style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#0284c720',color:'#38bdf8',border:'1px solid #0284c740',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600,opacity:upgradingAgentId === selServer.id ? 0.6 : 1}}>
+                        {upgradingAgentId === selServer.id ? '⏳ Обновление...' : '🔄 Обновить агент'}
+                      </button>
                       <button onClick={() => { loadServerAgentKeys(selServer.id); setShowAgentKeysModal(true) }} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#6c5ce720',color:'#a78bfa',border:'1px solid #6c5ce740',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600}}>
                         🔑 Ключи агента
                       </button>
-                    )}
+                    </>)}
                     <StatusBadge status={selServer?.status}/>
                   </div>
                 </div>
@@ -1244,7 +1283,7 @@ export default function Servers() {
 
             {/* Tab bar */}
             <div style={{display:'flex',borderBottom:'1px solid #1a2940',flexShrink:0}}>
-              {[{id:'agent',label:'🤖  Установить агент'},{id:'server',label:'🖥️  Подключить сервер'}].map(t=>(
+              {[{id:'agent',label:'🤖  Установить агент'},{id:'update',label:'🔄  Обновить агент'},{id:'server',label:'🖥️  Подключить сервер'}].map(t=>(
                 <button key={t.id} onClick={()=>setModalTab(t.id)} style={{padding:'12px 22px',border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:'transparent',color:modalTab===t.id?'#a78bfa':'#9aa4b2',borderBottom:modalTab===t.id?'2px solid #6c5ce7':'2px solid transparent',transition:'all 0.15s'}}>
                   {t.label}
                 </button>
@@ -1387,6 +1426,65 @@ export default function Servers() {
                       Закрыть
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── UPDATE TAB ── */}
+            {modalTab === 'update' && (
+              <div style={{padding:24,display:'flex',flexDirection:'column',gap:20}}>
+                <div style={{background:'#0284c715',border:'1px solid #0284c740',borderRadius:8,padding:14}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'#38bdf8',marginBottom:4}}>⚡ Автоматическое обновление агентов</div>
+                  <div style={{fontSize:12,color:'#c8d1dc',lineHeight:1.5}}>
+                    Платформа поддерживает обновление агентов тремя способами: одной командой на целевом сервере, кнопкой в карточке сервера (через SSH или heartbeat), либо запуском команды обновления для всех подключенных агентов.
+                  </div>
+                </div>
+
+                {/* Вариант 1: Команда на сервере */}
+                <div>
+                  <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:6}}>1. Обновление на Linux сервере (одной командой):</div>
+                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1a2940',borderRadius:6,padding:10,color:'#4ade80'}}>
+                    {`curl -sSf http://${typeof window !== 'undefined' ? window.location.hostname : '192.168.17.50'}:9000/agent/update.sh | sudo bash`}
+                  </pre>
+                  <button onClick={()=>{
+                    const cmd = `curl -sSf http://${window.location.hostname}:9000/agent/update.sh | sudo bash`
+                    navigator.clipboard.writeText(cmd)
+                    alert('✓ Команда скопирована в буфер обмена!')
+                  }} style={{marginTop:8,padding:'6px 12px',borderRadius:6,border:'none',background:'#0284c7',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>
+                    Копировать команду Linux
+                  </button>
+                </div>
+
+                {/* Вариант 2: Windows */}
+                <div>
+                  <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:6}}>2. Обновление на Windows сервере (PowerShell):</div>
+                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1a2940',borderRadius:6,padding:10,color:'#38bdf8'}}>
+                    {`irm http://${typeof window !== 'undefined' ? window.location.hostname : '192.168.17.50'}:9000/agent/update.ps1 | iex`}
+                  </pre>
+                  <button onClick={()=>{
+                    const cmd = `irm http://${window.location.hostname}:9000/agent/update.ps1 | iex`
+                    navigator.clipboard.writeText(cmd)
+                    alert('✓ Команда скопирована в буфер обмена!')
+                  }} style={{marginTop:8,padding:'6px 12px',borderRadius:6,border:'none',background:'#0284c7',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>
+                    Копировать команду Windows
+                  </button>
+                </div>
+
+                {/* Вариант 3: Массовое обновление */}
+                <div style={{background:'#07111e',border:'1px solid #1a2940',borderRadius:8,padding:14}}>
+                  <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:4}}>3. Централизованное обновление всех агентов:</div>
+                  <div style={{fontSize:11,color:'#9aa4b2',marginBottom:12}}>
+                    Отправляет сигнал обновления на все серверы. Каждый работающий агент скачает актуальный бинарник и перезапустится в течение 15–30 секунд.
+                  </div>
+                  <button onClick={handleUpgradeAllAgents} style={{padding:'8px 16px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                    🔄 Запланировать обновление для всех серверов
+                  </button>
+                </div>
+
+                <div style={{display:'flex',justifyContent:'flex-end',borderTop:'1px solid #1a2940',paddingTop:14}}>
+                  <button onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1a2940',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                    Закрыть
+                  </button>
                 </div>
               </div>
             )}

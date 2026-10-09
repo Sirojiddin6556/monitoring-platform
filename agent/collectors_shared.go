@@ -66,8 +66,79 @@ func collectSecurityUnix() SecurityInfo {
 func collectVMsUnix() []VMEntry {
 	var vms []VMEntry
 
-	if out := runCmd("VBoxManage", []string{"list", "vms"}, 8); out != "" {
-		runningOut := runCmd("VBoxManage", []string{"list", "runningvms"}, 8)
+	// 1. KVM / QEMU via virsh
+	if out := runCmd("virsh", []string{"list", "--all"}, 5); out != "" {
+		lines := strings.Split(out, "\n")
+		headerPassed := false
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "---") {
+				headerPassed = true
+				continue
+			}
+			if !headerPassed || line == "" {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				name := fields[1]
+				stRaw := strings.ToLower(strings.Join(fields[2:], " "))
+				state := "stopped"
+				if strings.Contains(stRaw, "running") {
+					state = "running"
+				} else if strings.Contains(stRaw, "paused") {
+					state = "paused"
+				}
+				vms = append(vms, VMEntry{Name: name, State: state, Type: "QEMU"})
+			}
+		}
+	}
+
+	// 2. Proxmox VE VMs via qm
+	if out := runCmd("qm", []string{"list"}, 5); out != "" {
+		lines := strings.Split(out, "\n")
+		for i, line := range lines {
+			if i == 0 {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				name := fields[1]
+				stRaw := strings.ToLower(fields[2])
+				state := "stopped"
+				if strings.Contains(stRaw, "running") {
+					state = "running"
+				} else if strings.Contains(stRaw, "paused") {
+					state = "paused"
+				}
+				vms = append(vms, VMEntry{Name: name, State: state, Type: "Proxmox"})
+			}
+		}
+	}
+
+	// 3. Proxmox VE LXC via pct
+	if out := runCmd("pct", []string{"list"}, 5); out != "" {
+		lines := strings.Split(out, "\n")
+		for i, line := range lines {
+			if i == 0 {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				name := fields[len(fields)-1]
+				stRaw := strings.ToLower(fields[1])
+				state := "stopped"
+				if strings.Contains(stRaw, "running") {
+					state = "running"
+				}
+				vms = append(vms, VMEntry{Name: name, State: state, Type: "LXC"})
+			}
+		}
+	}
+
+	// 4. VirtualBox
+	if out := runCmd("VBoxManage", []string{"list", "vms"}, 5); out != "" {
+		runningOut := runCmd("VBoxManage", []string{"list", "runningvms"}, 5)
 		runningSet := vboxNameSet(runningOut)
 		for _, line := range strings.Split(out, "\n") {
 			line = strings.TrimSpace(line)
@@ -83,11 +154,12 @@ func collectVMsUnix() []VMEntry {
 		}
 	}
 
-	if out := runCmd("vmrun", []string{"list"}, 8); out != "" {
+	// 5. VMware
+	if out := runCmd("vmrun", []string{"list"}, 5); out != "" {
 		for _, line := range strings.Split(out, "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasSuffix(strings.ToLower(line), ".vmx") {
-				idx := strings.LastIndexAny(line, `/\`)
+				idx := strings.LastIndexAny(line, `/\\`)
 				base := line[idx+1:]
 				name := strings.TrimSuffix(base, ".vmx")
 				vms = append(vms, VMEntry{Name: name, State: "running", Type: "VMware"})
@@ -222,35 +294,58 @@ func collectDockerCLI(dockerExe string) []DockerContainer {
 // ── Shared string helpers ─────────────────────────────────────────────────────
 
 func parsePct(s string) float64 {
-	s = strings.TrimSuffix(strings.TrimSpace(s), "%")
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, ",", ".")
+	if s == "" || s == "--" {
+		return 0
+	}
 	var f float64
-	if err := json.Unmarshal([]byte(s), &f); err == nil {
+	if _, err := fmt.Sscanf(s, "%f", &f); err == nil {
 		return round2(f)
 	}
 	return 0
 }
 
 func parseMemMb(s string) float64 {
-	parts := strings.Fields(strings.SplitN(s, "/", 2)[0])
-	if len(parts) == 0 {
+	first := strings.TrimSpace(strings.SplitN(s, "/", 2)[0])
+	if first == "" || first == "--" {
 		return 0
 	}
-	val := strings.ReplaceAll(parts[0], ",", ".")
-	var f float64
-	if err := json.Unmarshal([]byte(val), &f); err != nil {
+	first = strings.ReplaceAll(first, ",", ".")
+
+	var numStr strings.Builder
+	var unitStr strings.Builder
+	for _, r := range first {
+		if (r >= '0' && r <= '9') || r == '.' || r == '-' {
+			if unitStr.Len() == 0 {
+				numStr.WriteRune(r)
+			}
+		} else if r != ' ' {
+			unitStr.WriteRune(r)
+		}
+	}
+
+	var val float64
+	if _, err := fmt.Sscanf(numStr.String(), "%f", &val); err != nil {
 		return 0
 	}
-	if len(parts) > 1 {
-		unit := strings.ToLower(parts[1])
-		if strings.HasPrefix(unit, "g") {
-			return round2(f * 1024)
-		}
-		if strings.HasPrefix(unit, "k") {
-			return round2(f / 1024)
-		}
+
+	unit := strings.ToLower(unitStr.String())
+	switch {
+	case strings.HasPrefix(unit, "t"):
+		val *= 1024 * 1024
+	case strings.HasPrefix(unit, "g"):
+		val *= 1024
+	case strings.HasPrefix(unit, "m"):
+		// already MB
+	case strings.HasPrefix(unit, "k"):
+		val /= 1024
+	case strings.HasPrefix(unit, "b"):
+		val /= (1024 * 1024)
 	}
-	return round2(f)
+	return round2(val)
 }
 
 func dedupe(items []string, max int) []string {

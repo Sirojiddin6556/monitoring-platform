@@ -1,3 +1,7 @@
+_SLA_SUMMARY_CACHE = None
+_SLA_SUMMARY_CACHE_TIME = 0
+_SLA_CACHE_TTL = 60  # seconds
+
 """SLA / Uptime tracker router — Sprint 3.
 
 SLA records are computed hourly by Celery. This router provides query endpoints.
@@ -7,7 +11,7 @@ import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 
 from .. import db
 from ..models import (
@@ -32,10 +36,21 @@ def _uptime_color(pct: Optional[float]) -> str:
 
 
 @router.get("/summary")
-async def sla_summary(org_id: Optional[int] = None, current_user: dict = Depends(get_current_user)):
-    """Aggregated uptime% for all servers and websites over last 30 days."""
+async def sla_summary(
+    org_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """SLA summary for all servers and websites (30d, 7d, 24h). Cached for 60s."""
+    global _SLA_SUMMARY_CACHE, _SLA_SUMMARY_CACHE_TIME
     now = datetime.datetime.utcnow()
-    since = now - datetime.timedelta(days=30)
+    now_ts = now.timestamp()
+
+    # Serve from cache if available and fresh (for default all-orgs view)
+    if org_id is None and _SLA_SUMMARY_CACHE and (now_ts - _SLA_SUMMARY_CACHE_TIME) < _SLA_CACHE_TTL:
+        return _SLA_SUMMARY_CACHE
+    since_30d = now - datetime.timedelta(days=30)
+    since_7d = now - datetime.timedelta(days=7)
+    since_24h = now - datetime.timedelta(hours=24)
 
     role = current_user.get("role")
     user_org_ids = current_user.get("org_ids", [])
@@ -60,12 +75,8 @@ async def sla_summary(org_id: Optional[int] = None, current_user: dict = Depends
         result = []
 
         for srv in servers:
-            uptime_30d = await _compute_uptime(session, "server", srv.id, since, now)
-            uptime_7d = await _compute_uptime(
-                session, "server", srv.id, now - datetime.timedelta(days=7), now
-            )
-            uptime_24h = await _compute_uptime(
-                session, "server", srv.id, now - datetime.timedelta(hours=24), now
+            uptime_30d, uptime_7d, uptime_24h = await _compute_server_uptimes(
+                session, srv.id, since_30d, since_7d, since_24h, now
             )
             result.append({
                 "target_type": "server",
@@ -79,12 +90,8 @@ async def sla_summary(org_id: Optional[int] = None, current_user: dict = Depends
             })
 
         for ws in websites:
-            uptime_30d = await _compute_website_uptime(session, ws.id, since, now)
-            uptime_7d = await _compute_website_uptime(
-                session, ws.id, now - datetime.timedelta(days=7), now
-            )
-            uptime_24h = await _compute_website_uptime(
-                session, ws.id, now - datetime.timedelta(hours=24), now
+            uptime_30d, uptime_7d, uptime_24h = await _compute_website_uptimes(
+                session, ws.id, since_30d, since_7d, since_24h, now
             )
             result.append({
                 "target_type": "website",
@@ -97,7 +104,11 @@ async def sla_summary(org_id: Optional[int] = None, current_user: dict = Depends
                 "color_30d": _uptime_color(uptime_30d),
             })
 
-        return {"summary": result, "generated_at": now.isoformat()}
+        resp_data = {"summary": result, "generated_at": now.isoformat()}
+        if org_id is None:
+            _SLA_SUMMARY_CACHE = resp_data
+            _SLA_SUMMARY_CACHE_TIME = now_ts
+        return resp_data
 
 
 @router.get("/{target_type}/{target_id}")
@@ -221,39 +232,215 @@ async def sla_report(
         }
 
 
-async def _compute_uptime(session, target_type: str, target_id: str, since, until) -> Optional[float]:
-    """Compute uptime% from metrics table for a server."""
+async def _compute_server_uptimes(
+    session, server_id: str, since_30d, since_7d, since_24h, now
+) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    """Compute 30d, 7d, 24h uptimes in a single fast SQL aggregation query."""
     try:
-        res = await session.execute(
-            select(MetricModel)
-            .where(MetricModel.server_id == target_id)
-            .where(MetricModel.received_at >= since)
-            .where(MetricModel.received_at <= until)
-        )
-        metrics = res.scalars().all()
-        if not metrics:
+        q = text("""
+            SELECT 
+                COUNT(*),
+                COUNT(*) FILTER (WHERE (payload ->> 'status') IN ('ok', 'up')),
+                COUNT(*) FILTER (WHERE received_at >= :since_7d),
+                COUNT(*) FILTER (WHERE received_at >= :since_7d AND (payload ->> 'status') IN ('ok', 'up')),
+                COUNT(*) FILTER (WHERE received_at >= :since_24h),
+                COUNT(*) FILTER (WHERE received_at >= :since_24h AND (payload ->> 'status') IN ('ok', 'up'))
+            FROM metrics
+            WHERE server_id = :target_id 
+              AND received_at >= :since_30d 
+              AND received_at <= :now
+        """)
+        res = await session.execute(q, {
+            "target_id": str(server_id),
+            "since_30d": since_30d,
+            "since_7d": since_7d,
+            "since_24h": since_24h,
+            "now": now,
+        })
+        row = res.first()
+        if not row:
+            return None, None, None
+        t30, ok30, t7, ok7, t24, ok24 = row
+        u30 = round(ok30 / t30 * 100, 4) if t30 else None
+        u7 = round(ok7 / t7 * 100, 4) if t7 else None
+        u24 = round(ok24 / t24 * 100, 4) if t24 else None
+        return u30, u7, u24
+    except Exception:
+        # Fallback for SQLite
+        try:
+            q_fb = text("""
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN json_extract(payload, '$.status') IN ('ok', 'up') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_7d THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_7d AND json_extract(payload, '$.status') IN ('ok', 'up') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_24h THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_24h AND json_extract(payload, '$.status') IN ('ok', 'up') THEN 1 ELSE 0 END)
+                FROM metrics
+                WHERE server_id = :target_id 
+                  AND received_at >= :since_30d 
+                  AND received_at <= :now
+            """)
+            res = await session.execute(q_fb, {
+                "target_id": str(server_id),
+                "since_30d": since_30d,
+                "since_7d": since_7d,
+                "since_24h": since_24h,
+                "now": now,
+            })
+            row = res.first()
+            if not row:
+                return None, None, None
+            t30, ok30, t7, ok7, t24, ok24 = row
+            u30 = round(ok30 / t30 * 100, 4) if t30 else None
+            u7 = round(ok7 / t7 * 100, 4) if t7 else None
+            u24 = round(ok24 / t24 * 100, 4) if t24 else None
+            return u30, u7, u24
+        except Exception:
+            return None, None, None
+
+
+async def _compute_website_uptimes(
+    session, website_id: str, since_30d, since_7d, since_24h, now
+) -> tuple[Optional[float], Optional[float], Optional[float]]:
+    """Compute 30d, 7d, 24h uptimes for website in a single SQL query."""
+    try:
+        q = text("""
+            SELECT 
+                COUNT(*),
+                COUNT(*) FILTER (WHERE (payload ->> 'status') IN ('up', 'ok')),
+                COUNT(*) FILTER (WHERE received_at >= :since_7d),
+                COUNT(*) FILTER (WHERE received_at >= :since_7d AND (payload ->> 'status') IN ('up', 'ok')),
+                COUNT(*) FILTER (WHERE received_at >= :since_24h),
+                COUNT(*) FILTER (WHERE received_at >= :since_24h AND (payload ->> 'status') IN ('up', 'ok'))
+            FROM probes
+            WHERE website_id = :website_id 
+              AND received_at >= :since_30d 
+              AND received_at <= :now
+        """)
+        res = await session.execute(q, {
+            "website_id": str(website_id),
+            "since_30d": since_30d,
+            "since_7d": since_7d,
+            "since_24h": since_24h,
+            "now": now,
+        })
+        row = res.first()
+        if not row:
+            return None, None, None
+        t30, ok30, t7, ok7, t24, ok24 = row
+        u30 = round(ok30 / t30 * 100, 4) if t30 else None
+        u7 = round(ok7 / t7 * 100, 4) if t7 else None
+        u24 = round(ok24 / t24 * 100, 4) if t24 else None
+        return u30, u7, u24
+    except Exception:
+        # Fallback for SQLite
+        try:
+            q_fb = text("""
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN json_extract(payload, '$.status') IN ('up', 'ok') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_7d THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_7d AND json_extract(payload, '$.status') IN ('up', 'ok') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_24h THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN received_at >= :since_24h AND json_extract(payload, '$.status') IN ('up', 'ok') THEN 1 ELSE 0 END)
+                FROM probes
+                WHERE website_id = :website_id 
+                  AND received_at >= :since_30d 
+                  AND received_at <= :now
+            """)
+            res = await session.execute(q_fb, {
+                "website_id": str(website_id),
+                "since_30d": since_30d,
+                "since_7d": since_7d,
+                "since_24h": since_24h,
+                "now": now,
+            })
+            row = res.first()
+            if not row:
+                return None, None, None
+            t30, ok30, t7, ok7, t24, ok24 = row
+            u30 = round(ok30 / t30 * 100, 4) if t30 else None
+            u7 = round(ok7 / t7 * 100, 4) if t7 else None
+            u24 = round(ok24 / t24 * 100, 4) if t24 else None
+            return u30, u7, u24
+        except Exception:
+            return None, None, None
+
+
+async def _compute_uptime(session, target_type: str, target_id: str, since, until) -> Optional[float]:
+    """Compute uptime% from metrics table using SQL aggregation."""
+    try:
+        q = text("""
+            SELECT 
+                COUNT(*),
+                COUNT(*) FILTER (WHERE (payload ->> 'status') IN ('ok', 'up'))
+            FROM metrics
+            WHERE server_id = :target_id 
+              AND received_at >= :since 
+              AND received_at <= :until
+        """)
+        res = await session.execute(q, {"target_id": str(target_id), "since": since, "until": until})
+        row = res.first()
+        if not row or not row[0]:
             return None
-        total = len(metrics)
-        ok = sum(1 for m in metrics if (m.payload or {}).get("status") in ("ok", "up"))
+        total, ok = row[0], row[1] or 0
         return round(ok / total * 100, 4)
     except Exception:
-        return None
+        try:
+            q_fb = text("""
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN json_extract(payload, '$.status') IN ('ok', 'up') THEN 1 ELSE 0 END)
+                FROM metrics
+                WHERE server_id = :target_id 
+                  AND received_at >= :since 
+                  AND received_at <= :until
+            """)
+            res = await session.execute(q_fb, {"target_id": str(target_id), "since": since, "until": until})
+            row = res.first()
+            if not row or not row[0]:
+                return None
+            total, ok = row[0], row[1] or 0
+            return round(ok / total * 100, 4)
+        except Exception:
+            return None
 
 
 async def _compute_website_uptime(session, website_id: str, since, until) -> Optional[float]:
-    """Compute uptime% from probes table for a website."""
+    """Compute uptime% from probes table using SQL aggregation."""
     try:
-        res = await session.execute(
-            select(ProbeModel)
-            .where(ProbeModel.website_id == website_id)
-            .where(ProbeModel.received_at >= since)
-            .where(ProbeModel.received_at <= until)
-        )
-        probes = res.scalars().all()
-        if not probes:
+        q = text("""
+            SELECT 
+                COUNT(*),
+                COUNT(*) FILTER (WHERE (payload ->> 'status') IN ('up', 'ok'))
+            FROM probes
+            WHERE website_id = :website_id 
+              AND received_at >= :since 
+              AND received_at <= :until
+        """)
+        res = await session.execute(q, {"website_id": str(website_id), "since": since, "until": until})
+        row = res.first()
+        if not row or not row[0]:
             return None
-        total = len(probes)
-        ok = sum(1 for p in probes if (p.payload or {}).get("status") in ("up", "ok"))
+        total, ok = row[0], row[1] or 0
         return round(ok / total * 100, 4)
     except Exception:
-        return None
+        try:
+            q_fb = text("""
+                SELECT 
+                    COUNT(*),
+                    SUM(CASE WHEN json_extract(payload, '$.status') IN ('up', 'ok') THEN 1 ELSE 0 END)
+                FROM probes
+                WHERE website_id = :website_id 
+                  AND received_at >= :since 
+                  AND received_at <= :until
+            """)
+            res = await session.execute(q_fb, {"website_id": str(website_id), "since": since, "until": until})
+            row = res.first()
+            if not row or not row[0]:
+                return None
+            total, ok = row[0], row[1] or 0
+            return round(ok / total * 100, 4)
+        except Exception:
+            return None

@@ -89,18 +89,41 @@ def ping_servers(self):
         for srv in servers:
             if not srv.host:
                 continue
-            param = "-n" if platform.system().lower() == "windows" else "-c"
+            import socket
+            start = time.time()
+            status = "down"
+            elapsed_ms = None
             try:
-                start = time.time()
-                ret = subprocess.run(
-                    ["ping", param, "1", "-w", "3000", srv.host],
-                    capture_output=True, timeout=6,
-                )
-                elapsed_ms = round((time.time() - start) * 1000, 2)
-                status = "ok" if ret.returncode == 0 else "down"
+                is_win = platform.system().lower() == "windows"
+                cmd = ["ping", "-n", "1", "-w", "2000", srv.host] if is_win else ["ping", "-c", "1", "-W", "2", srv.host]
+                ret = subprocess.run(cmd, capture_output=True, timeout=3)
+                if ret.returncode == 0:
+                    elapsed_ms = round((time.time() - start) * 1000, 2)
+                    status = "ok"
             except Exception:
-                elapsed_ms = None
-                status = "down"
+                pass
+            if status != "ok":
+                for port in [22, 80, 443, 3389, 445, 5177]:
+                    try:
+                        sock_start = time.time()
+                        with socket.create_connection((srv.host, port), timeout=1.5):
+                            elapsed_ms = round((time.time() - sock_start) * 1000, 2)
+                            status = "ok"
+                            break
+                    except Exception:
+                        continue
+
+            # Fallback for agent-monitored nodes: if agent reported in last 60s, node is alive
+            if status != "ok":
+                recent_agent_metric = session.execute(
+                    sa_select(MetricModel)
+                    .where(MetricModel.server_id == srv.id)
+                    .where(MetricModel.metric_name == "system")
+                    .where(MetricModel.received_at >= now - datetime.timedelta(seconds=60))
+                ).first()
+                if recent_agent_metric:
+                    status = "ok"
+                    elapsed_ms = 0.5
 
             metric = MetricModel(
                 server_id=srv.id,

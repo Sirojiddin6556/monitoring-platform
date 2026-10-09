@@ -41,15 +41,19 @@ func (s *Sender) Send(p *Payload, bufLen *int) error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 
-	// Flush one buffered payload (older data → chronological order on backend).
-	s.mu.Lock()
-	var pending json.RawMessage
-	if len(s.buffer) > 0 {
-		pending = s.buffer[0]
-	}
-	s.mu.Unlock()
+	// Flush buffered payloads (up to 10 items) in chronological order.
+	for i := 0; i < 10; i++ {
+		s.mu.Lock()
+		var pending json.RawMessage
+		if len(s.buffer) > 0 {
+			pending = s.buffer[0]
+		}
+		s.mu.Unlock()
 
-	if pending != nil {
+		if pending == nil {
+			break
+		}
+
 		if postErr := s.post(pending); postErr == nil {
 			s.mu.Lock()
 			if len(s.buffer) > 0 {
@@ -58,6 +62,8 @@ func (s *Sender) Send(p *Payload, bufLen *int) error {
 			remaining := len(s.buffer)
 			s.mu.Unlock()
 			log.Printf("[agent] flushed 1 buffered payload (%d remaining)", remaining)
+		} else {
+			break
 		}
 	}
 
@@ -98,10 +104,28 @@ func (s *Sender) post(raw json.RawMessage) error {
 			lastErr = err
 			continue
 		}
-		resp.Body.Close()
+
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			// Check if backend instructed an upgrade in response body
+			var respMap map[string]interface{}
+			if err := json.NewDecoder(resp.Body).Decode(&respMap); err == nil {
+				if act, ok := respMap["upgrade_action"].(string); ok && act == "upgrade" {
+					targetVer, _ := respMap["target_version"].(string)
+					log.Printf("[agent] upgrade requested by backend! Target version: %s", targetVer)
+					go func() {
+						time.Sleep(2 * time.Second)
+						if err := PerformSelfUpdate(s.cfg, targetVer); err == nil {
+							RestartService()
+						} else {
+							log.Printf("[agent] self-update error: %v", err)
+						}
+					}()
+				}
+			}
+			resp.Body.Close()
 			return nil
 		}
+		resp.Body.Close()
 		lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
 		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 			break // client error — no point retrying

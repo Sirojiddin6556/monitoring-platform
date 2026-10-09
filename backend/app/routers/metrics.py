@@ -1,3 +1,16 @@
+async def _upsert_server_host_async(server_id: str, auto_name: str, client_ip: str):
+    try:
+        async with db.get_session() as session:
+            res = await session.execute(select(ServerModel).where(ServerModel.id == server_id))
+            db_srv = res.scalars().first()
+            if not db_srv:
+                session.add(ServerModel(id=server_id, name=auto_name, host=client_ip))
+            else:
+                db_srv.host = client_ip
+            await session.commit()
+    except Exception:
+        pass
+
 import time
 import asyncio
 from fastapi import APIRouter, Depends, Request, HTTPException, status, Header, WebSocket, WebSocketDisconnect
@@ -43,31 +56,13 @@ async def receive_metrics(payload: AgentMetricsPayload, request: Request):
                 found = True
                 if s['host'] != client_ip:
                     s['host'] = client_ip
-                    try:
-                        async with db.get_session() as session:
-                            res = await session.execute(select(ServerModel).where(ServerModel.id == server_id))
-                            db_srv = res.scalars().first()
-                            if db_srv:
-                                db_srv.host = client_ip
-                                await session.commit()
-                    except Exception:
-                        pass
+                    asyncio.create_task(_upsert_server_host_async(server_id, auto_name, client_ip))
                 break
 
         if not found:
             new_srv = {'id': server_id, 'name': auto_name, 'host': client_ip}
-            try:
-                async with db.get_session() as session:
-                    res = await session.execute(select(ServerModel).where(ServerModel.id == server_id))
-                    db_srv = res.scalars().first()
-                    if not db_srv:
-                        session.add(ServerModel(id=server_id, name=auto_name, host=client_ip))
-                    else:
-                        db_srv.host = client_ip
-                    await session.commit()
-            except Exception:
-                pass
             SERVERS.append(new_srv)
+            asyncio.create_task(_upsert_server_host_async(server_id, auto_name, client_ip))
 
         AGENT_METRICS[server_id] = {
             'metrics': payload_dict['metrics'],
@@ -112,7 +107,18 @@ async def receive_metrics(payload: AgentMetricsPayload, request: Request):
         await manager.send_json({"metric": ws_event})
     except Exception:
         pass
-    return {"status": "received"}
+
+    resp_out = {"status": "received"}
+    try:
+        from ..main import PENDING_AGENT_UPGRADES, get_latest_agent_version
+        if server_id in PENDING_AGENT_UPGRADES:
+            PENDING_AGENT_UPGRADES.discard(server_id)
+            resp_out["upgrade_action"] = "upgrade"
+            resp_out["target_version"] = get_latest_agent_version()
+    except Exception:
+        pass
+
+    return resp_out
 
 
 @router.post('/api/probe')

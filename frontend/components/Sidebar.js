@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 
 const NAV = [
   {
+    id: "executive",
+    icon: "👑",
+    label: "Дашборд Руководства",
+    href: "/executive",
+  },
+  {
     id: 'home',
     icon: '⬡',
     label: 'Главная',

@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -17,6 +18,11 @@ import (
 )
 
 // ── CPU ──────────────────────────────────────────────────────────────────────
+
+var (
+	prevCPUTimesMu sync.Mutex
+	prevCPUTimes   *cpu.TimesStat
+)
 
 func collectCPU() CPUDetail {
 	pct, _ := cpu.Percent(0, false)
@@ -34,13 +40,36 @@ func collectCPU() CPUDetail {
 	var user, system, idle, iowait float64
 	if len(times) > 0 {
 		t := times[0]
-		total := t.User + t.System + t.Idle + t.Iowait + t.Nice + t.Irq + t.Softirq + t.Steal
-		if total > 0 {
-			user = round1(t.User / total * 100)
-			system = round1(t.System / total * 100)
-			idle = round1(t.Idle / total * 100)
-			iowait = round1(t.Iowait / total * 100)
+		prevCPUTimesMu.Lock()
+		if prevCPUTimes != nil {
+			dUser := t.User - prevCPUTimes.User
+			dSys := t.System - prevCPUTimes.System
+			dIdle := t.Idle - prevCPUTimes.Idle
+			dIowait := t.Iowait - prevCPUTimes.Iowait
+			dNice := t.Nice - prevCPUTimes.Nice
+			dIrq := t.Irq - prevCPUTimes.Irq
+			dSoftirq := t.Softirq - prevCPUTimes.Softirq
+			dSteal := t.Steal - prevCPUTimes.Steal
+
+			dTotal := dUser + dSys + dIdle + dIowait + dNice + dIrq + dSoftirq + dSteal
+			if dTotal > 0 {
+				user = round1(dUser / dTotal * 100)
+				system = round1(dSys / dTotal * 100)
+				idle = round1(dIdle / dTotal * 100)
+				iowait = round1(dIowait / dTotal * 100)
+			}
+		} else {
+			total := t.User + t.System + t.Idle + t.Iowait + t.Nice + t.Irq + t.Softirq + t.Steal
+			if total > 0 {
+				user = round1(t.User / total * 100)
+				system = round1(t.System / total * 100)
+				idle = round1(t.Idle / total * 100)
+				iowait = round1(t.Iowait / total * 100)
+			}
 		}
+		tCopy := t
+		prevCPUTimes = &tCopy
+		prevCPUTimesMu.Unlock()
 	}
 
 	cores := make([]float64, 0, len(perCore))
@@ -105,6 +134,9 @@ func collectDisks() []DiskPartition {
 	}
 	var out []DiskPartition
 	for _, p := range parts {
+		if p.Fstype == "squashfs" || (len(p.Device) >= 9 && p.Device[:9] == "/dev/loop") || (len(p.Mountpoint) >= 5 && p.Mountpoint[:5] == "/snap") {
+			continue
+		}
 		u, err := disk.Usage(p.Mountpoint)
 		if err != nil {
 			continue

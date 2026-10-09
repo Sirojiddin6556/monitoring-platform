@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -16,10 +18,42 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-const maxBuffer = 25
+const maxBuffer = 500
 
 func main() {
+	flagVersion := flag.Bool("version", false, "Print agent version and exit")
+	flagUpdate := flag.Bool("update", false, "Update agent to latest version from backend and exit")
+	flagCheckUpdate := flag.Bool("check-update", false, "Check if update is available on backend")
+	flag.Parse()
+
 	cfg := loadConfig()
+
+	if *flagVersion {
+		fmt.Printf("Monitoring Agent v%s (os=%s arch=%s)\n", cfg.Version, runtime.GOOS, runtime.GOARCH)
+		os.Exit(0)
+	}
+
+	if *flagCheckUpdate {
+		log.Printf("[agent] checking for updates against %s ...", cfg.BackendURL)
+		updated, err := CheckAndUpdate(cfg, false)
+		if err != nil {
+			log.Fatalf("[agent] update check failed: %v", err)
+		}
+		if !updated {
+			log.Printf("[agent] already up to date (v%s)", cfg.Version)
+		}
+		os.Exit(0)
+	}
+
+	if *flagUpdate {
+		log.Printf("[agent] initiating manual update from %s ...", cfg.BackendURL)
+		if err := PerformSelfUpdate(cfg, ""); err != nil {
+			log.Fatalf("[agent] manual update failed: %v", err)
+		}
+		log.Printf("[agent] update complete. Restarting service...")
+		RestartService()
+		os.Exit(0)
+	}
 
 	log.SetFlags(log.LstdFlags)
 
@@ -84,6 +118,7 @@ func main() {
 	warmupDone := false
 	var lastSendMs float64
 	var bufLen int
+	var cycleCount int
 
 	interval := time.Duration(cfg.Interval) * time.Second
 	ttlFast := time.Duration(maxInt(cfg.Interval, 60)) * time.Second
@@ -189,6 +224,15 @@ func main() {
 
 		_ = sender.Send(payload, &bufLen)
 		lastSendMs = float64(time.Since(tStart).Milliseconds())
+
+		cycleCount++
+		if cycleCount%240 == 0 {
+			go func() {
+				if updated, _ := CheckAndUpdate(cfg, false); updated {
+					RestartService()
+				}
+			}()
+		}
 
 		// Interruptible sleep — checks shutdown and pause flag every 500ms.
 		deadline := time.Now().Add(interval)
