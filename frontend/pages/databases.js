@@ -4,15 +4,30 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import Link from 'next/link'
 import apiFetch from '../lib/api'
 
+function parseNum(val) {
+  if (val == null) return null
+  const s = String(val).replace(',', '.').trim()
+  const n = parseFloat(s)
+  return Number.isFinite(n) ? n : null
+}
+
+function isContainerRunning(c) {
+  if (!c) return false
+  const st = String(c.status || '').toLowerCase()
+  const state = String(c.state || '').toLowerCase()
+  return st.includes('up') || st.includes('running') || st === 'ok' ||
+         state.includes('up') || state.includes('running') || state === 'ok'
+}
+
 function StatusBadge({status}){
   const s = String(status || '').toLowerCase()
-  const isUp = ['ok', 'active', 'running', 'up'].includes(s)
+  const isUp = ['ok', 'active', 'running', 'up'].includes(s) || s.includes('running') || s.includes('up')
   return (
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
       gap: 6,
-      padding: '3px 8px',
+      padding: '3px 9px',
       borderRadius: 12,
       background: isUp ? 'rgba(74,222,128,0.12)' : 'rgba(239,68,68,0.12)',
       border: `1px solid ${isUp ? 'rgba(74,222,128,0.3)' : 'rgba(239,68,68,0.3)'}`,
@@ -63,6 +78,24 @@ function getDbType(image = '', name = '') {
   return { type: 'База данных', icon: '🗄️', color: '#6366f1' }
 }
 
+function resolveServerInfo(c, serversList = []) {
+  const sid = String(c.server_id || '').trim()
+  const sname = String(c.server_name || '').trim()
+  
+  const matched = serversList.find(s => {
+    if (s.id && (s.id === sid || s.id === sname)) return true
+    if (s.name && (s.name === sname || s.name === sid)) return true
+    if (s.host === '192.168.17.50' && (sname === 'xsilex' || sid === 'xsilex' || sname.includes('monitoring') || sid.includes('monitoring') || sname === '464d713372b7')) return true
+    if (s.host === '192.168.17.49' && (sname === 'hrm' || sid === 'hrm' || sname.includes('SSV.HRM'))) return true
+    if (s.host === '192.168.17.51' && (sname === 'klaster' || sid === 'klaster')) return true
+    return false
+  })
+  if (matched) {
+    return { name: matched.name, host: matched.host, id: matched.id }
+  }
+  return { name: sname || sid || 'Локальный хост', host: '—', id: sid }
+}
+
 export default function Databases() {
   const [databases, setDatabases] = useState([])
   const [loading, setLoading] = useState(true)
@@ -100,7 +133,7 @@ export default function Databases() {
         const agentDbs = item.detail.databases || []
         for (const db of agentDbs) {
           const typeInfo = getDbType('', db.type || db.name)
-          const key = `${s.id}-${db.name}`
+          const key = `${s.host || s.id}-${db.name}`
           dbMap.set(key, {
             id: key,
             name: db.name,
@@ -111,10 +144,10 @@ export default function Databases() {
             serverHost: s.host || '—',
             serverId: s.id,
             status: db.status || (s.status === 'ok' ? 'running' : 'down'),
-            latency_ms: db.latency_ms ?? null,
-            cpu_pct: db.cpu ?? null,
-            memory_mb: db.memory_mb ?? null,
-            ports: db.port ? String(db.port) : '—',
+            latency_ms: parseNum(db.latency_ms),
+            cpu_pct: parseNum(db.cpu),
+            memory_mb: parseNum(db.memory_mb),
+            ports: db.port ? String(db.port) : (typeInfo.type === 'PostgreSQL' ? '5432' : typeInfo.type === 'Redis' ? '6379' : '—'),
             image: db.version || 'Agent Probe',
             source: 'Проба агента',
           })
@@ -129,8 +162,8 @@ export default function Databases() {
           const isDb = ['postgres', 'redis', 'mysql', 'mariadb', 'mongo', 'clickhouse', 'timescale', '-db'].some(k => low.includes(k))
           if (isDb) {
             const typeInfo = getDbType(img, name)
-            const key = `${s.id}-${name || c.id}`
-            const isUp = String(c.status || c.state || '').toLowerCase().includes('up') || String(c.state || '').toLowerCase() === 'running'
+            const key = `${s.host || s.id}-${name || c.id}`
+            const isUp = isContainerRunning(c)
             dbMap.set(key, {
               id: key,
               name: name || c.id,
@@ -142,8 +175,8 @@ export default function Databases() {
               serverId: s.id,
               status: isUp ? 'running' : 'stopped',
               latency_ms: null,
-              cpu_pct: c.cpu_percent != null ? Number(c.cpu_percent) : null,
-              memory_mb: c.memory_usage_mb != null ? Number(c.memory_usage_mb) : null,
+              cpu_pct: parseNum(c.cpu_percent ?? c.cpu),
+              memory_mb: parseNum(c.mem_mb ?? c.memory_usage_mb ?? c.mem),
               ports: c.ports || (typeInfo.type === 'PostgreSQL' ? '5432' : typeInfo.type === 'Redis' ? '6379' : '—'),
               image: img || 'docker',
               source: 'Docker Контейнер',
@@ -160,25 +193,23 @@ export default function Databases() {
         const isDb = ['postgres', 'redis', 'mysql', 'mariadb', 'mongo', 'clickhouse', 'timescale', '-db'].some(k => low.includes(k))
         if (isDb) {
           const typeInfo = getDbType(img, name)
-          const srvName = c.server_name || c.server_id || 'Локальный хост'
-          const key = `${srvName}-${name || c.id}`
+          const srv = resolveServerInfo(c, serversList)
+          const key = `${srv.host || srv.name}-${name || c.id}`
           if (!dbMap.has(key)) {
-            const isUp = String(c.status || c.state || '').toLowerCase().includes('up') || String(c.state || '').toLowerCase() === 'running'
-            // Find server host if possible
-            const matchingServer = serversList.find(s => s.id === c.server_id || s.name === c.server_name)
+            const isUp = isContainerRunning(c)
             dbMap.set(key, {
               id: key,
               name: name || c.id,
               type: typeInfo.type,
               icon: typeInfo.icon,
               color: typeInfo.color,
-              serverName: srvName,
-              serverHost: matchingServer?.host || '—',
-              serverId: matchingServer?.id || c.server_id,
+              serverName: srv.name,
+              serverHost: srv.host,
+              serverId: srv.id,
               status: isUp ? 'running' : 'stopped',
               latency_ms: null,
-              cpu_pct: c.cpu_percent != null ? Number(c.cpu_percent) : null,
-              memory_mb: c.memory_usage_mb != null ? Number(c.memory_usage_mb) : null,
+              cpu_pct: parseNum(c.cpu_percent ?? c.cpu),
+              memory_mb: parseNum(c.mem_mb ?? c.memory_usage_mb ?? c.mem),
               ports: c.ports || (typeInfo.type === 'PostgreSQL' ? '5432' : typeInfo.type === 'Redis' ? '6379' : '—'),
               image: img || 'docker',
               source: 'Docker Контейнер',
