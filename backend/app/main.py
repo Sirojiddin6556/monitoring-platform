@@ -191,6 +191,13 @@ async def health():
 # (registered above via app.include_router(_auth_router.router))
 
 
+# Prometheus metrics
+START_TIME = time.time()
+REQUESTS_PING = Counter('backend_requests_ping_total', 'Count of ping requests')
+REQUESTS_METRICS = Counter('backend_requests_metrics_total', 'Count of metrics POSTs')
+REQUESTS_PROBE = Counter('backend_requests_probe_total', 'Count of probe POSTs')
+REQUESTS_UPTIME = Gauge('backend_uptime_seconds', 'Backend uptime in seconds')
+
 @app.get("/api/ping")
 async def ping():
     REQUESTS_PING.inc()
