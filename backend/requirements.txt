@@ -22,3 +22,5 @@ sentry-sdk[fastapi]==1.40.0
 # Sprint 4: Background task queue
 celery[redis]==5.3.6
 redis==5.0.1
+pyvmomi>=8.0.0.0
+

@@ -499,6 +499,7 @@ async def startup_event():
     asyncio.create_task(background_server_pinger())
     asyncio.create_task(background_api_monitor())
     asyncio.create_task(background_data_cleanup())
+    asyncio.create_task(background_hypervisor_poller())
 
     # Автозапуск Telegram бота как фоновой задачи
     try:
@@ -3844,6 +3845,40 @@ async def refresh_hypervisor(hv_id: int, current_user: dict = Depends(get_admin_
         }
 
 
+async def background_hypervisor_poller():
+    """Фоновый опрос всех активных гипервизоров каждые 60 секунд"""
+    await asyncio.sleep(15)
+    while True:
+        try:
+            async with db.async_session() as session:
+                result = await session.execute(select(HypervisorModel).where(HypervisorModel.is_active == True))
+                hvs = result.scalars().all()
+                for hv in hvs:
+                    try:
+                        vms = []
+                        error = None
+                        if hv.hv_type == 'hyperv' and hv.server_id:
+                            agent_data = AGENT_METRICS.get(hv.server_id, {})
+                            vms = agent_data.get('virtual_machines', [])
+                        elif hv.hv_type == 'proxmox' and hv.api_url:
+                            vms, error = await _fetch_proxmox_vms(hv.api_url, hv.username, hv.password, hv.token)
+                        elif hv.hv_type == 'vmware' and hv.api_url:
+                            vms, error = await _fetch_vmware_vms(hv.api_url, hv.username, hv.password)
+
+                        now = datetime.datetime.utcnow()
+                        hv.last_check = now
+                        hv.last_status = 'online' if vms and not error else ('error' if error else 'offline')
+                        if vms:
+                            hv.last_data = vms
+                            VM_CACHE[hv.id] = {'vms': vms, 'timestamp': now.isoformat()}
+                        await session.commit()
+                    except Exception as err:
+                        logging.getLogger('main').warning(f"Error polling hypervisor {hv.name}: {err}")
+        except Exception as e:
+            logging.getLogger('main').warning(f"Hypervisor poller error: {e}")
+        await asyncio.sleep(60)
+
+
 @app.get('/api/vm/all')
 async def all_vms(current_user: dict = Depends(get_admin_user)):
     """Агрегированный список всех ВМ со всех гипервизоров + из агентов"""
@@ -3988,42 +4023,112 @@ async def _fetch_proxmox_vms(api_url: str, username: str = None, password: str =
         return vms, str(e)
 
 
-async def _fetch_vmware_vms(api_url: str, username: str = None, password: str = None):
-    """Получить ВМ из VMware vSphere REST API"""
-    vms = []
+def _fetch_vmware_vms_sync(api_url: str, username: str = None, password: str = None):
+    """Получить ВМ из VMware ESXi / vCenter через pyvmomi SOAP API"""
+    import ssl
+    from urllib.parse import urlparse
+    from pyVim.connect import SmartConnect, Disconnect
+    from pyVmomi import vim
+
+    parsed = urlparse(api_url)
+    host = parsed.hostname or api_url.replace('https://', '').replace('http://', '').split('/')[0].split(':')[0]
+    port = parsed.port or 443
+
+    ctx = ssl._create_unverified_context()
+    si = SmartConnect(host=host, user=username or '', pwd=password or '', port=port, sslContext=ctx)
     try:
-        async with httpx.AsyncClient(verify=not ALLOW_INSECURE_TLS, timeout=15) as client:
-            # Session auth
-            auth_resp = await client.post(f'{api_url}/api/session',
-                auth=(username or '', password or ''))
-            if auth_resp.status_code not in (200, 201):
-                return [], f'Auth failed: {auth_resp.status_code}'
-            
-            session_id = auth_resp.json() if auth_resp.headers.get('content-type', '').startswith('application/json') else auth_resp.text.strip('"')
-            headers = {'vmware-api-session-id': session_id}
-            
-            # Get VMs
-            vms_resp = await client.get(f'{api_url}/api/vcenter/vm', headers=headers)
-            if vms_resp.status_code != 200:
-                return [], f'VMs request failed: {vms_resp.status_code}'
-            
-            for vm in vms_resp.json():
-                state_map = {'POWERED_ON': 'running', 'POWERED_OFF': 'stopped', 'SUSPENDED': 'paused'}
-                vms.append({
-                    'name': vm.get('name', ''),
-                    'vmid': vm.get('vm', ''),
-                    'state': state_map.get(vm.get('power_state', ''), vm.get('power_state', 'unknown')),
-                    'cpu_count': vm.get('cpu_count', 0),
-                    'ram_mb': vm.get('memory_size_MiB', 0),
-                    'type': 'vm',
-                })
-            
-            # Cleanup session
-            await client.delete(f'{api_url}/api/session', headers=headers)
-        
+        content = si.RetrieveContent()
+        container = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
+        vms = []
+        state_map = {
+            'poweredOn': 'running',
+            'poweredOff': 'stopped',
+            'suspended': 'paused'
+        }
+        for vm in container.view:
+            s = vm.summary
+            c = getattr(s, 'config', None)
+            r = getattr(s, 'runtime', None)
+            g = getattr(s, 'guest', None)
+            q = getattr(s, 'quickStats', None)
+
+            disk_gb = 0
+            try:
+                if s.storage and s.storage.committed:
+                    disk_gb = round(s.storage.committed / (1024**3), 1)
+            except Exception:
+                pass
+
+            cpu_usage_mhz = getattr(q, 'overallCpuUsage', 0) or 0
+            max_cpu_mhz = getattr(r, 'maxCpuUsage', 0) or 0
+            cpu_pct = 0.0
+            if max_cpu_mhz and max_cpu_mhz > 0:
+                cpu_pct = round((cpu_usage_mhz / max_cpu_mhz) * 100, 1)
+
+            ram_mb = getattr(c, 'memorySizeMB', 0) if c else 0
+            ram_used_mb = getattr(q, 'guestMemoryUsage', 0) or 0
+            uptime = getattr(q, 'uptimeSeconds', 0) or 0
+            power_state = getattr(r, 'powerState', '') if r else ''
+
+            vms.append({
+                'name': getattr(c, 'name', 'VM') if c else 'VM',
+                'vmid': str(getattr(c, 'instanceUuid', '') or getattr(c, 'name', '')),
+                'state': state_map.get(power_state, str(power_state).lower()),
+                'type': 'vmware',
+                'cpu_count': getattr(c, 'numCpu', 0) if c else 0,
+                'cpu_usage': cpu_pct,
+                'ram_mb': ram_mb,
+                'ram_used_mb': ram_used_mb,
+                'disk_gb': disk_gb,
+                'uptime': uptime,
+                'ip_address': getattr(g, 'ipAddress', '') or '',
+                'os': getattr(g, 'guestFullName', '') or '',
+            })
+        container.Destroy()
         return vms, None
-    except Exception as e:
-        return vms, str(e)
+    finally:
+        Disconnect(si)
+
+
+async def _fetch_vmware_vms(api_url: str, username: str = None, password: str = None):
+    """Получить ВМ из VMware (ESXi SOAP API или vCenter REST API)"""
+    import asyncio
+    try:
+        return await asyncio.to_thread(_fetch_vmware_vms_sync, api_url, username, password)
+    except Exception as esxi_err:
+        logger.warning(f"pyvmomi fetch failed: {esxi_err}, falling back to REST...")
+        vms = []
+        try:
+            async with httpx.AsyncClient(verify=False, timeout=15) as client:
+                auth_resp = await client.post(
+                    f'{api_url}/api/session',
+                    auth=(username or '', password or '')
+                )
+                if auth_resp.status_code not in (200, 201):
+                    return [], f'VMware connection failed: {esxi_err}'
+
+                session_id = auth_resp.json() if auth_resp.headers.get('content-type', '').startswith('application/json') else auth_resp.text.strip('"')
+                headers = {'vmware-api-session-id': session_id}
+
+                vms_resp = await client.get(f'{api_url}/api/vcenter/vm', headers=headers)
+                if vms_resp.status_code != 200:
+                    return [], f'VMs request failed: {vms_resp.status_code}'
+
+                for vm in vms_resp.json():
+                    state_map = {'POWERED_ON': 'running', 'POWERED_OFF': 'stopped', 'SUSPENDED': 'paused'}
+                    vms.append({
+                        'name': vm.get('name', ''),
+                        'vmid': vm.get('vm', ''),
+                        'state': state_map.get(vm.get('power_state', ''), vm.get('power_state', 'unknown')),
+                        'cpu_count': vm.get('cpu_count', 0),
+                        'ram_mb': vm.get('memory_size_MiB', 0),
+                        'type': 'vmware',
+                    })
+
+                await client.delete(f'{api_url}/api/session', headers=headers)
+            return vms, None
+        except Exception as e:
+            return [], f'VMware error: {esxi_err}' 
 
 
 # ===================== ОРГАНИЗАЦИИ =====================
