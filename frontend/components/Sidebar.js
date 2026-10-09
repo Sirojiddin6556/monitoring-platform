@@ -54,6 +54,7 @@ const NAV = [
     label: 'Аналитика',
     items: [
       { label: 'Дашборды', href: '/dashboards' },
+      { label: 'Grafana',   href: 'http://192.168.17.50:3001', external: true },
       { label: 'Отчёты',   soon: true },
     ],
   },
@@ -105,9 +106,39 @@ function anyChildActive(items, pathname) {
   return false
 }
 
-function NavLeaf({ label, href, depth, pathname }) {
+function NavLeaf({ label, href, depth, pathname, external }) {
   const [hover, setHover] = useState(false)
-  const active = href === pathname || (href !== '/' && pathname.startsWith(href + '/'))
+  const isExt = external || (href && href.startsWith('http'))
+  const active = !isExt && (href === pathname || (href !== '/' && pathname.startsWith(href + '/')))
+  
+  if (isExt) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: `5px 10px 5px ${12 + depth * 14}px`,
+          color: hover ? '#c4cfe0' : '#6272a4',
+          background: hover ? 'rgba(255,255,255,0.04)' : 'none',
+          fontSize: 12.5,
+          textDecoration: 'none',
+          borderRadius: '0 6px 6px 0',
+          transition: 'color 0.12s, background 0.12s',
+          lineHeight: 1.5,
+        }}
+      >
+        <span style={{ flex: 1 }}>{label}</span>
+        <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span>
+      </a>
+    )
+  }
+
   return (
     <Link
       href={href}
@@ -198,7 +229,7 @@ function NavSubGroup({ item, depth, pathname, open, toggle }) {
       {isOpen && item.items.map(sub =>
         sub.soon
           ? <NavSoon key={sub.label} label={sub.label} depth={depth + 1} />
-          : <NavLeaf key={sub.href} label={sub.label} href={sub.href} depth={depth + 1} pathname={pathname} />
+          : <NavLeaf key={sub.href} label={sub.label} href={sub.href} depth={depth + 1} pathname={pathname} external={sub.external} />
       )}
     </div>
   )
@@ -286,7 +317,7 @@ export default function Sidebar() {
                 )
               }
               if (item.soon) return <NavSoon key={item.label} label={item.label} depth={0} />
-              return <NavLeaf key={item.href} label={item.label} href={item.href} depth={0} pathname={pathname} />
+              return <NavLeaf key={item.href} label={item.label} href={item.href} depth={0} pathname={pathname} external={item.external} />
             })}
           </div>
         )}

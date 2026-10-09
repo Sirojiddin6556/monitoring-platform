@@ -314,8 +314,27 @@ export default function Home() {
       <div className="app-shell">
         <Sidebar />
         <div className="page" style={{maxWidth:'100%'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}>
-            <h1 style={{margin:0}}>Обзор системы</h1>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24,flexWrap:'wrap',gap:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <h1 style={{margin:0}}>Обзор системы</h1>
+              <Link href="/executive" style={{
+                display:'inline-flex',
+                alignItems:'center',
+                gap:7,
+                padding:'6px 14px',
+                borderRadius:8,
+                background:'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color:'#fff',
+                textDecoration:'none',
+                fontSize:12,
+                fontWeight:700,
+                boxShadow:'0 2px 10px rgba(99,102,241,0.35)',
+                letterSpacing:0.2,
+              }}>
+                <span>📊</span>
+                <span>Ситуационный Центр</span>
+              </Link>
+            </div>
             <div style={{display:'flex',gap:10,alignItems:'center'}}>
               <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
                 <span style={{width:8,height:8,borderRadius:'50%',background:ping?.ping?'#4ade80':'#ef4444'}}/>
@@ -383,13 +402,40 @@ export default function Home() {
               <h3 style={{margin:0,fontSize:14}}>Быстрые разделы</h3>
               <span style={{fontSize:11,color:'#9aa4b2'}}>без списков на главной</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10}}>
-              <Link href="/servers" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🖥️ Серверы</Link>
-              <Link href="/websites" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🌐 Сайты</Link>
-              <Link href="/docker" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🐳 Docker</Link>
-              <Link href="/vms" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🧩 Виртуальные машины</Link>
-              <Link href="/telegram" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🤖 Telegram</Link>
-              <Link href="/alerts" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12}}>🔔 Алерты</Link>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:10}}>
+              <Link href="/executive" style={{padding:'10px 12px',borderRadius:8,background:'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(79,70,229,0.08) 100%)',border:'1px solid rgba(99,102,241,0.3)',color:'#e0e7ff',textDecoration:'none',fontSize:12,fontWeight:600,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>📊</span>
+                <span>Ситуационный Центр</span>
+              </Link>
+              <Link href="/servers" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🖥️</span>
+                <span>Серверы</span>
+              </Link>
+              <Link href="/vms" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🧩</span>
+                <span>ВМ (ESXi)</span>
+              </Link>
+              <Link href="/databases" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🗄️</span>
+                <span>Базы данных</span>
+              </Link>
+              <Link href="/docker" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🐳</span>
+                <span>Docker</span>
+              </Link>
+              <Link href="/websites" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🌐</span>
+                <span>Сайты</span>
+              </Link>
+              <a href="http://192.168.17.50:3001" target="_blank" rel="noopener noreferrer" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>📈</span>
+                <span style={{flex:1}}>Grafana</span>
+                <span style={{fontSize:10,opacity:0.6}}>↗</span>
+              </a>
+              <Link href="/alerts" style={{padding:'10px 12px',borderRadius:8,background:'#07111e',border:'1px solid #1a2940',color:'#d6deea',textDecoration:'none',fontSize:12,display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:16}}>🔔</span>
+                <span>Алерты</span>
+              </Link>
             </div>
           </div>
 

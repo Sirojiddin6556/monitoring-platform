@@ -3731,13 +3731,18 @@ async def list_hypervisors(current_user: dict = Depends(get_admin_user)):
     for h in hypervisors:
         cached = VM_CACHE.get(h.id, {})
         vms = cached.get('vms', [])
+        host_stats = cached.get('host_stats', {})
         if not vms and h.last_data:
-            vms = h.last_data if isinstance(h.last_data, list) else h.last_data.get('vms', [])
-        
+            if isinstance(h.last_data, list):
+                vms = h.last_data
+            elif isinstance(h.last_data, dict):
+                vms = h.last_data.get('vms', [])
+                host_stats = h.last_data.get('host_stats', {})
+
         running = sum(1 for v in vms if (v.get('state', '') or '').lower() in ('running', 'started', 'on'))
         stopped = sum(1 for v in vms if (v.get('state', '') or '').lower() in ('stopped', 'off', 'shutoff', 'poweroff'))
         paused = sum(1 for v in vms if (v.get('state', '') or '').lower() in ('paused', 'suspended'))
-        
+
         items.append({
             'id': h.id,
             'name': h.name,
@@ -3748,6 +3753,7 @@ async def list_hypervisors(current_user: dict = Depends(get_admin_user)):
             'last_check': h.last_check.isoformat() if h.last_check else None,
             'last_status': h.last_status,
             'vms': vms,
+            'host_stats': host_stats,
             'stats': {
                 'total': len(vms),
                 'running': running,
@@ -3824,7 +3830,7 @@ async def refresh_hypervisor(hv_id: int, current_user: dict = Depends(get_admin_
             vms, error = await _fetch_proxmox_vms(hv.api_url, hv.username, hv.password, hv.token)
         
         elif hv.hv_type == 'vmware' and hv.api_url:
-            vms, error = await _fetch_vmware_vms(hv.api_url, hv.username, hv.password)
+            vms, host_stats, error = await _fetch_vmware_vms(hv.api_url, hv.username, hv.password)
         
         else:
             error = 'Не настроен источник данных'
@@ -3832,10 +3838,11 @@ async def refresh_hypervisor(hv_id: int, current_user: dict = Depends(get_admin_
         now = datetime.datetime.utcnow()
         hv.last_check = now
         hv.last_status = 'online' if vms and not error else ('error' if error else 'offline')
-        hv.last_data = vms
+        payload = {'vms': vms, 'host_stats': host_stats}
+        hv.last_data = payload
         await session.commit()
         
-        VM_CACHE[hv_id] = {'vms': vms, 'timestamp': now.isoformat()}
+        VM_CACHE[hv_id] = {'vms': vms, 'host_stats': host_stats, 'timestamp': now.isoformat()}
         
         return {
             'vms': vms,
@@ -3863,14 +3870,14 @@ async def background_hypervisor_poller():
                         elif hv.hv_type == 'proxmox' and hv.api_url:
                             vms, error = await _fetch_proxmox_vms(hv.api_url, hv.username, hv.password, hv.token)
                         elif hv.hv_type == 'vmware' and hv.api_url:
-                            vms, error = await _fetch_vmware_vms(hv.api_url, hv.username, hv.password)
+                            vms, host_stats, error = await _fetch_vmware_vms(hv.api_url, hv.username, hv.password)
 
                         now = datetime.datetime.utcnow()
                         hv.last_check = now
                         hv.last_status = 'online' if vms and not error else ('error' if error else 'offline')
                         if vms:
-                            hv.last_data = vms
-                            VM_CACHE[hv.id] = {'vms': vms, 'timestamp': now.isoformat()}
+                            hv.last_data = {'vms': vms, 'host_stats': host_stats}
+                            VM_CACHE[hv.id] = {'vms': vms, 'host_stats': host_stats, 'timestamp': now.isoformat()}
                         await session.commit()
                     except Exception as err:
                         logging.getLogger('main').warning(f"Error polling hypervisor {hv.name}: {err}")
@@ -4024,7 +4031,7 @@ async def _fetch_proxmox_vms(api_url: str, username: str = None, password: str =
 
 
 def _fetch_vmware_vms_sync(api_url: str, username: str = None, password: str = None):
-    """Получить ВМ из VMware ESXi / vCenter через pyvmomi SOAP API"""
+    """Получить ВМ и метрики хоста из VMware ESXi / vCenter через pyvmomi SOAP API"""
     import ssl
     from urllib.parse import urlparse
     from pyVim.connect import SmartConnect, Disconnect
@@ -4038,6 +4045,52 @@ def _fetch_vmware_vms_sync(api_url: str, username: str = None, password: str = N
     si = SmartConnect(host=host, user=username or '', pwd=password or '', port=port, sslContext=ctx)
     try:
         content = si.RetrieveContent()
+
+        # Host stats
+        host_stats = {}
+        try:
+            host_view = content.viewManager.CreateContainerView(content.rootFolder, [vim.HostSystem], True)
+            for h in host_view.view:
+                hs = h.summary
+                h_cpu_mhz = (getattr(hs.hardware, 'cpuMhz', 0) or 0) * (getattr(hs.hardware, 'numCpuCores', 1) or 1)
+                h_cpu_used = getattr(hs.quickStats, 'overallCpuUsage', 0) or 0
+                h_mem_mb = round((getattr(hs.hardware, 'memorySize', 0) or 0) / 1024 / 1024)
+                h_mem_used = getattr(hs.quickStats, 'overallMemoryUsage', 0) or 0
+
+                ds_total = 0
+                ds_free = 0
+                for ds in getattr(h, 'datastore', []):
+                    try:
+                        ds_total += getattr(ds.summary, 'capacity', 0) or 0
+                        ds_free += getattr(ds.summary, 'freeSpace', 0) or 0
+                    except Exception:
+                        pass
+
+                ds_total_gb = round(ds_total / 1024 / 1024 / 1024, 1)
+                ds_used_gb = round((ds_total - ds_free) / 1024 / 1024 / 1024, 1)
+
+                product_name = getattr(getattr(hs, 'config', None), 'product', None)
+                full_name = getattr(product_name, 'fullName', '') if product_name else 'VMware ESXi'
+
+                host_stats = {
+                    'model': getattr(hs.hardware, 'cpuModel', 'Intel Xeon'),
+                    'cpu_cores': getattr(hs.hardware, 'numCpuCores', 0),
+                    'cpu_mhz_total': h_cpu_mhz,
+                    'cpu_mhz_used': h_cpu_used,
+                    'cpu_pct': round((h_cpu_used / h_cpu_mhz) * 100, 1) if h_cpu_mhz else 0,
+                    'ram_mb_total': h_mem_mb,
+                    'ram_mb_used': h_mem_used,
+                    'ram_pct': round((h_mem_used / h_mem_mb) * 100, 1) if h_mem_mb else 0,
+                    'disk_gb_total': ds_total_gb,
+                    'disk_gb_used': ds_used_gb,
+                    'disk_pct': round((ds_used_gb / ds_total_gb) * 100, 1) if ds_total_gb else 0,
+                    'version': full_name
+                }
+                break
+            host_view.Destroy()
+        except Exception as host_e:
+            logging.getLogger('main').warning(f"Error fetching host stats: {host_e}")
+
         container = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
         vms = []
         state_map = {
@@ -4085,19 +4138,20 @@ def _fetch_vmware_vms_sync(api_url: str, username: str = None, password: str = N
                 'os': getattr(g, 'guestFullName', '') or '',
             })
         container.Destroy()
-        return vms, None
+        return vms, host_stats, None
     finally:
         Disconnect(si)
 
 
 async def _fetch_vmware_vms(api_url: str, username: str = None, password: str = None):
-    """Получить ВМ из VMware (ESXi SOAP API или vCenter REST API)"""
+    """Получить ВМ и метрики хоста из VMware (ESXi SOAP API или vCenter REST API)"""
     import asyncio
     try:
         return await asyncio.to_thread(_fetch_vmware_vms_sync, api_url, username, password)
     except Exception as esxi_err:
-        logger.warning(f"pyvmomi fetch failed: {esxi_err}, falling back to REST...")
+        logging.getLogger('main').warning(f"pyvmomi fetch failed: {esxi_err}, falling back to REST...")
         vms = []
+        host_stats = {}
         try:
             async with httpx.AsyncClient(verify=False, timeout=15) as client:
                 auth_resp = await client.post(
@@ -4105,14 +4159,14 @@ async def _fetch_vmware_vms(api_url: str, username: str = None, password: str = 
                     auth=(username or '', password or '')
                 )
                 if auth_resp.status_code not in (200, 201):
-                    return [], f'VMware connection failed: {esxi_err}'
+                    return [], {}, f'VMware connection failed: {esxi_err}'
 
                 session_id = auth_resp.json() if auth_resp.headers.get('content-type', '').startswith('application/json') else auth_resp.text.strip('"')
                 headers = {'vmware-api-session-id': session_id}
 
                 vms_resp = await client.get(f'{api_url}/api/vcenter/vm', headers=headers)
                 if vms_resp.status_code != 200:
-                    return [], f'VMs request failed: {vms_resp.status_code}'
+                    return [], {}, f'VMs request failed: {vms_resp.status_code}'
 
                 for vm in vms_resp.json():
                     state_map = {'POWERED_ON': 'running', 'POWERED_OFF': 'stopped', 'SUSPENDED': 'paused'}
@@ -4126,9 +4180,9 @@ async def _fetch_vmware_vms(api_url: str, username: str = None, password: str = 
                     })
 
                 await client.delete(f'{api_url}/api/session', headers=headers)
-            return vms, None
+            return vms, host_stats, None
         except Exception as e:
-            return [], f'VMware error: {esxi_err}' 
+            return [], {}, f'VMware error: {esxi_err}' 
 
 
 # ===================== ОРГАНИЗАЦИИ =====================

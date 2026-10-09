@@ -194,8 +194,25 @@ const MINI_CARDS = [
   {label:'IOPS Write', key:'iops_write', color:'#fb923c', unit:'IO/s'},
 ]
 
+function findMatchedVm(server, vmsList) {
+  if (!server || !vmsList || !vmsList.length) return null
+  const sh = (server.host || '').trim()
+  const sn = (server.name || '').toLowerCase().trim()
+  return vmsList.find(v => {
+    const vIp = (v.ip_address || '').trim()
+    const vn = (v.name || '').toLowerCase().trim()
+    if (vIp && sh && (vIp === sh || sh.includes(vIp) || vIp.includes(sh))) return true
+    if (vn && sn && (vn === sn || vn.includes(sn) || sn.includes(vn))) return true
+    if (sh === '192.168.17.49' && (vn.includes('ssv.hrm') || vIp === '192.168.17.49')) return true
+    if (sh === '192.168.17.51' && (vn.includes('davomaat') || vIp === '192.168.17.51')) return true
+    if (sh === '192.168.17.50' && (vn.includes('monitoring') || vIp === '192.168.17.50')) return true
+    return false
+  })
+}
+
 export default function Servers() {
   const [servers, setServers] = useState([])
+  const [vms, setVms] = useState([])
   const [selected, setSelected] = useState(null)
   const [metrics, setMetrics] = useState([])
   const [serverDetail, setServerDetail] = useState(null)
@@ -277,7 +294,6 @@ export default function Servers() {
   const loadServers = async () => {
     setLoading(true); setError(null)
     try {
-
       const d = await apiFetch('/api/servers')
       setServers((d.servers || []).map(s => {
         const lastMetrics = normalizeMetrics(s.last_metrics || {})
@@ -288,6 +304,7 @@ export default function Servers() {
           last_ping: s.last_ping ?? pingFromMetrics ?? null,
         }
       }))
+      apiFetch('/api/vm/all').then(vd => setVms(vd.vms || [])).catch(() => {})
     } catch(e) { setError('Ошибка загрузки серверов'); setServers([]) }
     finally { setLoading(false) }
   }
@@ -612,6 +629,48 @@ export default function Servers() {
           <GaugeRing value={curMetrics.ping?.value||0} max={500} color="#4ade80" label="Пинг" unit="мс"/>
         </div>
       </div>
+      {(() => {
+        const matchedVm = findMatchedVm(selServer, vms)
+        if (!matchedVm) return null
+        return (
+          <div className="card" style={{padding:'14px 16px',background:'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(15,23,42,0.6) 100%)',border:'1px solid rgba(99,102,241,0.25)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span style={{fontSize:18}}>🧩</span>
+                <span style={{fontSize:13,fontWeight:700,color:'#fff'}}>Виртуализация VMware ESXi</span>
+                <span style={{fontSize:10,padding:'2px 6px',borderRadius:4,background:'rgba(74,222,128,0.15)',color:'#4ade80',fontWeight:600}}>
+                  ● {matchedVm.state || matchedVm.status || 'running'}
+                </span>
+              </div>
+              <Link href="/vms" style={{fontSize:11,color:'#818cf8',textDecoration:'none',fontWeight:600,display:'inline-flex',alignItems:'center',gap:4}}>
+                <span>Открыть в разделе ВМ</span>
+                <span>→</span>
+              </Link>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
+              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+                <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Физический гипервизор</div>
+                <div style={{fontSize:13,fontWeight:600,color:'#fff'}}>{matchedVm.source_name || 'VM-SSV'}</div>
+                <div style={{fontSize:11,color:'#818cf8',marginTop:2}}>ESXi 6.7.0 (192.168.18.222)</div>
+              </div>
+              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+                <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Виртуальная машина (Guest)</div>
+                <div style={{fontSize:13,fontWeight:600,color:'#fff'}}>{matchedVm.name}</div>
+                <div style={{fontSize:11,color:'#9aa4b2',marginTop:2}}>{matchedVm.os || 'Ubuntu Linux (64-bit)'}</div>
+              </div>
+              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+                <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Выделенные ресурсы ESXi</div>
+                <div style={{fontSize:13,fontWeight:600,color:'#38bdf8'}}>
+                  {matchedVm.cpu_count || '—'} vCPU · {matchedVm.ram_mb ? `${Math.round(matchedVm.ram_mb / 1024)} GB` : '—'} RAM
+                </div>
+                <div style={{fontSize:11,color:'#9aa4b2',marginTop:2}}>
+                  {matchedVm.disk_gb ? `Диск: ${matchedVm.disk_gb} GB` : 'Хранилище: Datastore1'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
       {serverUptime && (
         <div className="card" style={{padding:'12px 16px'}}>
           <div style={{fontSize:10,color:'#9aa4b2',textTransform:'uppercase',letterSpacing:0.5,marginBottom:10}}>Uptime</div>
@@ -1140,6 +1199,16 @@ export default function Servers() {
                           </div>
                         </div>
                         <div style={{fontSize:10,color:'#9aa4b2'}}>{s.host||'no host'} <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:s.monitor_type==='ssh'?'#00b89422':s.monitor_type==='winrm'?'#0984e322':s.monitor_type==='ping_only'?'#f39c1222':'#6c5ce722',color:s.monitor_type==='ssh'?'#00b894':s.monitor_type==='winrm'?'#0984e3':s.monitor_type==='ping_only'?'#f39c12':'#a29bfe',marginLeft:4}}>{s.monitor_type==='ssh'?'SSH':s.monitor_type==='winrm'?'WinRM':s.monitor_type==='ping_only'?'Ping':s.monitor_type==='agent'?'Agent':'Agent'}</span></div>
+                        {(() => {
+                          const sVm = findMatchedVm(s, vms)
+                          if (!sVm) return null
+                          return (
+                            <div style={{display:'inline-flex',alignItems:'center',gap:4,marginTop:3,padding:'1px 6px',borderRadius:4,background:'rgba(99,102,241,0.12)',border:'1px solid rgba(99,102,241,0.25)',color:'#a5b4fc',fontSize:9}}>
+                              <span>🧩</span>
+                              <span>VMware: {sVm.source_name || 'VM-SSV'}</span>
+                            </div>
+                          )
+                        })()}
                         {sM.cpu && <div style={{display:'flex',gap:8,marginTop:4,fontSize:9,color:'#9aa4b2'}}><span>CPU {sM.cpu.value}%</span><span>RAM {sM.ram?.value}%</span><span>Disk {sM.disk?.value}%</span></div>}
                       </div>
                       <button onClick={e=>{e.stopPropagation();handleDeleteServer(s.id)}} title="Удалить" style={{background:'none',border:'none',color:'#ef4444',cursor:'pointer',fontSize:12,padding:2,opacity:0.4}}>✕</button>
@@ -1174,7 +1243,34 @@ export default function Servers() {
                 <BigChart data={chartSeries} dataKey="ping" color="#4ade80" title="Пинг (история)" unit="мс" height={280}/>
               </>) : (<>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                  <div><h2 style={{margin:0,fontSize:20}}>{selServer?.name}</h2><span style={{fontSize:12,color:'#9aa4b2'}}>{selServer?.host} · {selServer?.id}</span></div>
+                  <div>
+                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                      <h2 style={{margin:0,fontSize:20}}>{selServer?.name}</h2>
+                      {(() => {
+                        const selVm = findMatchedVm(selServer, vms)
+                        if (!selVm) return null
+                        return (
+                          <Link href="/vms" style={{
+                            display:'inline-flex',
+                            alignItems:'center',
+                            gap:5,
+                            padding:'2px 8px',
+                            borderRadius:6,
+                            background:'rgba(99,102,241,0.15)',
+                            border:'1px solid rgba(99,102,241,0.3)',
+                            color:'#a5b4fc',
+                            textDecoration:'none',
+                            fontSize:11,
+                            fontWeight:600,
+                          }}>
+                            <span>🧩 VMware: {selVm.source_name || 'VM-SSV'}</span>
+                            <span style={{opacity:0.6}}>→</span>
+                          </Link>
+                        )
+                      })()}
+                    </div>
+                    <span style={{fontSize:12,color:'#9aa4b2'}}>{selServer?.host} · {selServer?.id}</span>
+                  </div>
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     {selServer?.monitor_type === 'agent' && (<>
                       {agentData?.agent_version && (
