@@ -55,7 +55,7 @@ const NAV = [
     items: [
       { label: 'Дашборды', href: '/dashboards' },
       { label: 'Grafana',   href: 'http://192.168.17.50:3001', external: true },
-      { label: 'Отчёты',   soon: true },
+      { label: 'Отчёты',   href: '/reports' },
     ],
   },
   {
