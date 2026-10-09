@@ -1,4 +1,5 @@
 import {useEffect, useState, useMemo, useRef, useCallback} from 'react'
+import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts'
