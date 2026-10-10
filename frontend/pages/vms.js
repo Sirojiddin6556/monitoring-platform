@@ -3,12 +3,36 @@ import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
 import apiFetch from '../lib/api'
+import {
+  Layers,
+  Server,
+  Cpu,
+  HardDrive,
+  RefreshCw,
+  Trash2,
+  Plus,
+  Search,
+  ArrowUpRight,
+  Activity,
+  Play,
+  Pause,
+  Sliders,
+  Radio
+} from 'lucide-react'
+
 
 function StatBox({label, value, color}) {
   return (
-    <div className="card" style={{padding:'16px 20px',minWidth:130,textAlign:'center'}}>
-      <div style={{fontSize:24,fontWeight:700,color:color||'#fff'}}>{value}</div>
-      <div style={{fontSize:11,color:'#9aa4b2',marginTop:4}}>{label}</div>
+    <div style={{
+      background: '#101726',
+      border: '1px solid #1e293b',
+      borderRadius: 6,
+      padding: '12px 18px',
+      minWidth: 130,
+      textAlign: 'center'
+    }}>
+      <div style={{fontSize:22,fontWeight:700,color:color||'#f8fafc',fontVariantNumeric:'tabular-nums'}}>{value}</div>
+      <div style={{fontSize:11,color:'#64748b',marginTop:4}}>{label}</div>
     </div>
   )
 }
@@ -34,7 +58,7 @@ function TypeBadge({type}) {
     qemu: {bg:'#e5650020',color:'#fb923c',label:'QEMU'},
     lxc: {bg:'#06b6d420',color:'#22d3ee',label:'LXC'},
   }
-  const c = cfg[(type||'').toLowerCase()] || {bg:'#1a294020',color:'#9aa4b2',label:type||'VM'}
+  const c = cfg[(type||'').toLowerCase()] || {bg:'rgba(30, 41, 59, 0.5)',color:'#9aa4b2',label:type||'VM'}
   return <span style={{padding:'2px 8px',borderRadius:4,background:c.bg,color:c.color,fontSize:10,fontWeight:700}}>{c.label}</span>
 }
 
@@ -69,6 +93,7 @@ function findMatchedServer(vm, servers) {
 }
 
 export default function VMs() {
+  const [mounted, setMounted] = useState(false)
   const [vms, setVms] = useState([])
   const [stats, setStats] = useState({total:0,running:0,stopped:0,paused:0})
   const [hypervisors, setHypervisors] = useState([])
@@ -100,6 +125,7 @@ export default function VMs() {
   }, [])
 
   useEffect(() => {
+    setMounted(true)
     loadData()
     const t = setInterval(loadData, 15000)
     return () => clearInterval(t)
@@ -155,7 +181,7 @@ export default function VMs() {
   const sources = [...new Set(vms.map(v=>v.source_name).filter(Boolean))]
   const types = [...new Set(vms.map(v=>v.type||v.hv_type).filter(Boolean))]
 
-  const inputStyle = {padding:'6px 10px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}
+  const inputStyle = {padding:'6px 10px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}
 
   return (
     <ProtectedRoute requiredRole="admin">
@@ -163,10 +189,10 @@ export default function VMs() {
         <Sidebar/>
         <div className="page" style={{maxWidth:'100%'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-            <h1 style={{margin:0}}>🖥️ Виртуальные машины</h1>
+            <h1 style={{margin:0}}> Виртуальные машины</h1>
             <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>setTab(tab==='vms'?'hypervisors':'vms')} style={{padding:'6px 14px',borderRadius:4,border:'1px solid #1a2940',background:tab==='hypervisors'?'#0d1b2e':'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12}}>{tab==='vms'?'Гипервизоры':'← Все ВМ'}</button>
-              <button onClick={()=>setShowAdd(!showAdd)} style={{padding:'6px 14px',borderRadius:4,border:'none',background:'#6366f1',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>{showAdd?'✕':'+ Добавить гипервизор'}</button>
+              <button onClick={()=>setTab(tab==='vms'?'hypervisors':'vms')} style={{padding:'6px 14px',borderRadius:4,border:'1px solid #1e293b',background:tab==='hypervisors'?'#101726':'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12}}>{tab==='vms'?'Гипервизоры':'← Все ВМ'}</button>
+              <button onClick={()=>setShowAdd(!showAdd)} style={{padding:'6px 14px',borderRadius:4,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>{showAdd?'✕':'+ Добавить гипервизор'}</button>
             </div>
           </div>
 
@@ -221,7 +247,7 @@ export default function VMs() {
                     </div>
                   )}
                 </>)}
-                <button type="submit" disabled={addLoading} style={{padding:'7px 16px',borderRadius:4,border:'none',background:'#6366f1',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>{addLoading?'...':'Добавить'}</button>
+                <button type="submit" disabled={addLoading} style={{padding:'7px 16px',borderRadius:4,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>{addLoading?'...':'Добавить'}</button>
               </div>
               {addError && <div style={{color:'#ef4444',fontSize:11,marginTop:8}}>{addError}</div>}
             </form>
@@ -234,7 +260,7 @@ export default function VMs() {
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
               {hypervisors.length===0 && (
                 <div className="card" style={{padding:40,textAlign:'center'}}>
-                  <div style={{fontSize:40,opacity:0.3,marginBottom:12}}>🖥️</div>
+                  <div style={{fontSize:40,opacity:0.3,marginBottom:12}}></div>
                   <div style={{color:'#9aa4b2',fontSize:14}}>Гипервизоры не добавлены</div>
                 </div>
               )}
@@ -249,7 +275,7 @@ export default function VMs() {
                         <StateDot state={h.last_status}/>
                       </div>
                       <div style={{display:'flex',gap:6}}>
-                        <button onClick={()=>handleRefresh(h.id)} style={{padding:'5px 12px',borderRadius:4,border:'1px solid #1a2940',background:'#0d1b2e',color:'#d6deea',cursor:'pointer',fontSize:11}}>🔄 Обновить</button>
+                        <button onClick={()=>handleRefresh(h.id)} style={{padding:'5px 12px',borderRadius:4,border:'1px solid #1e293b',background:'#101726',color:'#d6deea',cursor:'pointer',fontSize:11}}>🔄 Обновить</button>
                         <button onClick={()=>handleDeleteHv(h.id)} style={{padding:'5px 10px',borderRadius:4,border:'1px solid #ef444460',background:'transparent',color:'#ef4444',cursor:'pointer',fontSize:11}}>✕</button>
                       </div>
                     </div>
@@ -265,9 +291,9 @@ export default function VMs() {
 
                     {/* Host hardware resource bars */}
                     {hs.cpu_cores > 0 && (
-                      <div style={{background:'#07111e',borderRadius:8,padding:'12px 16px',marginBottom:16,border:'1px solid #1a2940'}}>
+                      <div style={{background:'#090d16',borderRadius:8,padding:'12px 16px',marginBottom:16,border:'1px solid #1e293b'}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,fontSize:11,color:'#9aa4b2',flexWrap:'wrap',gap:6}}>
-                          <span style={{fontWeight:600,color:'#d6deea'}}>⚙️ Оборудование хоста: {hs.model}</span>
+                          <span style={{fontWeight:600,color:'#d6deea'}}> Оборудование хоста: {hs.model}</span>
                           <span style={{color:'#818cf8'}}>{hs.version}</span>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:14}}>
@@ -279,7 +305,7 @@ export default function VMs() {
                                 {hs.cpu_pct}% ({Math.round(hs.cpu_mhz_used || 0)} / {Math.round(hs.cpu_mhz_total || 0)} MHz)
                               </span>
                             </div>
-                            <div style={{height:6,background:'#1a2940',borderRadius:3,overflow:'hidden'}}>
+                            <div style={{height:6,background:'#1e293b',borderRadius:3,overflow:'hidden'}}>
                               <div style={{width:`${Math.min(100, hs.cpu_pct||0)}%`,height:'100%',background:hs.cpu_pct>80?'#ef4444':'#3b82f6',transition:'width 0.3s'}}/>
                             </div>
                           </div>
@@ -291,7 +317,7 @@ export default function VMs() {
                                 {hs.ram_pct}% ({Math.round((hs.ram_mb_used||0)/1024*10)/10} / {Math.round((hs.ram_mb_total||0)/1024*10)/10} GB)
                               </span>
                             </div>
-                            <div style={{height:6,background:'#1a2940',borderRadius:3,overflow:'hidden'}}>
+                            <div style={{height:6,background:'#1e293b',borderRadius:3,overflow:'hidden'}}>
                               <div style={{width:`${Math.min(100, hs.ram_pct||0)}%`,height:'100%',background:hs.ram_pct>85?'#ef4444':'#8b5cf6',transition:'width 0.3s'}}/>
                             </div>
                           </div>
@@ -304,7 +330,7 @@ export default function VMs() {
                                   {hs.disk_pct}% ({Math.round(hs.disk_gb_used||0)} / {Math.round(hs.disk_gb_total||0)} GB)
                                 </span>
                               </div>
-                              <div style={{height:6,background:'#1a2940',borderRadius:3,overflow:'hidden'}}>
+                              <div style={{height:6,background:'#1e293b',borderRadius:3,overflow:'hidden'}}>
                                 <div style={{width:`${Math.min(100, hs.disk_pct||0)}%`,height:'100%',background:hs.disk_pct>85?'#ef4444':'#10b981',transition:'width 0.3s'}}/>
                               </div>
                             </div>
@@ -317,7 +343,7 @@ export default function VMs() {
                       <div style={{overflowX:'auto'}}>
                         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                           <thead>
-                            <tr style={{borderBottom:'1px solid #1a2940'}}>
+                            <tr style={{borderBottom:'1px solid #1e293b'}}>
                               <th style={thStyle}>Имя ВМ</th>
                               <th style={thStyle}>Статус</th>
                               <th style={thStyle}>IP / Привязка к серверу</th>
@@ -332,15 +358,15 @@ export default function VMs() {
                             {h.vms.map((vm,i)=>{
                               const matched = findMatchedServer(vm, servers)
                               return (
-                                <tr key={i} style={{borderBottom:'1px solid #0d1b2e'}}>
+                                <tr key={i} style={{borderBottom:'1px solid #101726'}}>
                                   <td style={tdStyle}><span style={{fontWeight:600,color:'#fff'}}>{vm.name}</span></td>
                                   <td style={tdStyle}><StateDot state={vm.state}/></td>
                                   <td style={tdStyle}>
                                     <div style={{display:'flex',alignItems:'center',gap:6}}>
                                       {vm.ip_address ? <span style={{fontFamily:'monospace',color:'#9aa4b2'}}>{vm.ip_address}</span> : '—'}
                                       {matched && (
-                                        <Link href="/servers" style={{padding:'2px 7px',borderRadius:4,background:'#6366f120',color:'#818cf8',textDecoration:'none',fontSize:11,fontWeight:600}}>
-                                          🖥️ {matched.name}
+                                        <Link href="/servers" style={{padding:'2px 7px',borderRadius:4,background:'rgba(37, 99, 235, 0.1)',color:'#818cf8',textDecoration:'none',fontSize:11,fontWeight:600}}>
+                                           {matched.name}
                                         </Link>
                                       )}
                                     </div>
@@ -368,7 +394,7 @@ export default function VMs() {
             <>
               {/* Filters */}
               <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
-                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по имени, IP, ОС..." style={{...inputStyle,width:240}}/>
+                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск по имени, IP, ОС..." style={{...inputStyle,width:240}}/>
                 <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{...inputStyle,width:140}}>
                   <option value="all">Все статусы</option>
                   <option value="running">Работают</option>
@@ -392,7 +418,7 @@ export default function VMs() {
 
               {vms.length===0 && (
                 <div className="card" style={{padding:60,textAlign:'center'}}>
-                  <div style={{fontSize:48,opacity:0.3,marginBottom:16}}>🖥️</div>
+                  <div style={{fontSize:48,opacity:0.3,marginBottom:16}}></div>
                   <div style={{color:'#9aa4b2',fontSize:15}}>Виртуальные машины не найдены</div>
                   <div style={{color:'#9aa4b2',fontSize:12,marginTop:8}}>Добавьте гипервизор или обновите агент на сервере с Hyper-V</div>
                 </div>
@@ -403,7 +429,7 @@ export default function VMs() {
                   <div style={{overflowX:'auto'}}>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                       <thead>
-                        <tr style={{background:'#0a1929'}}>
+                        <tr style={{background:'#101726'}}>
                           <th style={thStyle}>Имя</th>
                           <th style={thStyle}>Статус</th>
                           <th style={thStyle}>Тип</th>
@@ -421,8 +447,8 @@ export default function VMs() {
                         {filtered.map((vm,i) => {
                           const matched = findMatchedServer(vm, servers)
                           return (
-                            <tr key={i} style={{borderBottom:'1px solid #0d1b2e',transition:'background 0.15s'}}
-                                onMouseEnter={e=>e.currentTarget.style.background='#0d1b2e40'}
+                            <tr key={i} style={{borderBottom:'1px solid #101726',transition:'background 0.15s'}}
+                                onMouseEnter={e=>e.currentTarget.style.background='#131d31'}
                                 onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                               <td style={tdStyle}><span style={{fontWeight:600,color:'#fff'}}>{vm.name||'—'}</span></td>
                               <td style={tdStyle}><StateDot state={vm.state}/></td>
@@ -431,8 +457,8 @@ export default function VMs() {
                                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                                   {vm.ip_address ? <span style={{fontFamily:'monospace',color:'#9aa4b2'}}>{vm.ip_address}</span> : '—'}
                                   {matched && (
-                                    <Link href="/servers" style={{padding:'2px 7px',borderRadius:4,background:'#6366f120',color:'#818cf8',textDecoration:'none',fontSize:11,fontWeight:600}}>
-                                      🖥️ {matched.name}
+                                    <Link href="/servers" style={{padding:'2px 7px',borderRadius:4,background:'rgba(37, 99, 235, 0.1)',color:'#818cf8',textDecoration:'none',fontSize:11,fontWeight:600}}>
+                                       {matched.name}
                                     </Link>
                                   )}
                                 </div>
@@ -444,7 +470,7 @@ export default function VMs() {
                               <td style={tdStyle}><span style={{color:'#9aa4b2',fontSize:11}}>{vm.os || '—'}</span></td>
                               <td style={tdStyle}>{formatUptime(vm.uptime)}</td>
                               <td style={tdStyle}>
-                                <span style={{padding:'2px 8px',borderRadius:4,background:'#1a294040',color:'#9aa4b2',fontSize:10}}>{vm.source_name||'—'}</span>
+                                <span style={{padding:'2px 8px',borderRadius:4,background:'#1e293b',color:'#9aa4b2',fontSize:10}}>{vm.source_name||'—'}</span>
                               </td>
                             </tr>
                           )
