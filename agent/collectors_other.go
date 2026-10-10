@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -96,8 +97,63 @@ func collectSecurity() SecurityInfo {
 
 // ── Recent logs ───────────────────────────────────────────────────────────────
 
+func splitLogLines(s string) []string {
+	var out []string
+	for _, l := range strings.Split(s, "\n") {
+		l = strings.TrimSpace(l)
+		if l != "" {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+func getRecentLogLines(cmdName string, args []string, fallbackFile string, count int) []string {
+	out := runCmd(cmdName, args, 3)
+	lines := splitLogLines(out)
+	if len(lines) > 0 {
+		if len(lines) > count {
+			return lines[len(lines)-count:]
+		}
+		return lines
+	}
+	if fallbackFile != "" {
+		fOut := runCmd("tail", []string{"-n", fmt.Sprintf("%d", count), fallbackFile}, 2)
+		fLines := splitLogLines(fOut)
+		if len(fLines) > 0 {
+			return fLines
+		}
+	}
+	return []string{}
+}
+
 func collectRecentLogs() RecentLogs {
-	return RecentLogs{System: []string{}, Auth: []string{}, Error: []string{}}
+	sys := getRecentLogLines("journalctl", []string{"-n", "50", "--no-pager", "-o", "short-iso"}, "/var/log/syslog", 50)
+	if len(sys) == 0 {
+		sys = getRecentLogLines("tail", []string{"-n", "50", "/var/log/messages"}, "", 50)
+	}
+
+	auth := getRecentLogLines("journalctl", []string{"-u", "ssh", "-u", "sshd", "-n", "50", "--no-pager", "-o", "short-iso"}, "/var/log/auth.log", 50)
+	if len(auth) == 0 {
+		auth = getRecentLogLines("tail", []string{"-n", "50", "/var/log/secure"}, "", 50)
+	}
+
+	errLogs := getRecentLogLines("journalctl", []string{"-p", "err..emerg", "-n", "50", "--no-pager", "-o", "short-iso"}, "/var/log/kern.log", 50)
+	if len(errLogs) == 0 {
+		dmesg := runCmd("dmesg", []string{"-T"}, 2)
+		dL := splitLogLines(dmesg)
+		if len(dL) > 50 {
+			errLogs = dL[len(dL)-50:]
+		} else {
+			errLogs = dL
+		}
+	}
+
+	return RecentLogs{
+		System: sys,
+		Auth:   auth,
+		Error:  errLogs,
+	}
 }
 
 // ── Virtual Machines ──────────────────────────────────────────────────────────

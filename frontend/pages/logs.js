@@ -38,31 +38,80 @@ function normalizeLogEntries(rawEntries) {
 
 function parseEventLine(line) {
   const src = String(line || '')
+  
+  // Windows Event Pattern
   const pattern = /Event\[(\d+)\]\s*\|\s*Log Name:\s*([^|]+)\|\s*Source:\s*([^|]+)\|\s*Id:\s*([^|]+)\|\s*Level:\s*([^|]+)\|\s*Date:\s*([^|]+)\|\s*Message:\s*(.*)$/i
   const m = src.match(pattern)
-  if (!m) {
+  if (m) {
+    return {
+      raw: src,
+      index: m[1],
+      logName: m[2].trim(),
+      source: m[3].trim(),
+      eventId: m[4].trim(),
+      level: m[5].trim(),
+      date: m[6].trim(),
+      message: m[7].trim(),
+      parsed: true,
+    }
+  }
+
+  // Linux Journalctl / Syslog ISO pattern (2026-10-10T10:40:01+0000 hostname process[pid]: message)
+  const isoMatch = src.match(/^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\s]*)\s+([^\s]+)\s+([^:]+):\s+(.*)$/)
+  if (isoMatch) {
+    const isError = /error|fail|crit|panic|emergency|fatal/i.test(src)
+    const isWarn = /warn|timeout|refused|denied|degraded/i.test(src)
+    const isAuth = /ssh|sshd|session opened|accepted|sudo|pam_unix/i.test(src)
+    const level = isError ? 'Error' : isWarn ? 'Warning' : isAuth ? 'Auth' : 'Info'
     return {
       raw: src,
       index: null,
-      logName: null,
-      source: null,
+      logName: 'journal',
+      source: isoMatch[3].trim(),
       eventId: null,
-      level: null,
-      date: null,
-      message: src,
-      parsed: false,
+      level,
+      date: isoMatch[1].replace('+0000', '').replace('T', ' '),
+      message: isoMatch[4],
+      parsed: true,
     }
   }
+
+  // Standard BSD syslog pattern (Oct 10 10:40:01 hostname process[pid]: message)
+  const bsdMatch = src.match(/^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+([^\s]+)\s+([^:]+):\s+(.*)$/)
+  if (bsdMatch) {
+    const isError = /error|fail|crit|panic|emergency|fatal/i.test(src)
+    const isWarn = /warn|timeout|refused|denied|degraded/i.test(src)
+    const isAuth = /ssh|sshd|session opened|accepted|sudo|pam_unix/i.test(src)
+    const level = isError ? 'Error' : isWarn ? 'Warning' : isAuth ? 'Auth' : 'Info'
+    return {
+      raw: src,
+      index: null,
+      logName: 'syslog',
+      source: bsdMatch[3].trim(),
+      eventId: null,
+      level,
+      date: bsdMatch[1],
+      message: bsdMatch[4],
+      parsed: true,
+    }
+  }
+
+  // General raw fallback
+  const isError = /error|fail|crit|panic|emergency|fatal/i.test(src)
+  const isWarn = /warn|timeout|refused|denied|degraded/i.test(src)
+  const isAuth = /ssh|sshd|session opened|accepted|sudo|pam_unix/i.test(src)
+  const level = isError ? 'Error' : isWarn ? 'Warning' : isAuth ? 'Auth' : 'Info'
+
   return {
     raw: src,
-    index: m[1],
-    logName: m[2].trim(),
-    source: m[3].trim(),
-    eventId: m[4].trim(),
-    level: m[5].trim(),
-    date: m[6].trim(),
-    message: m[7].trim(),
-    parsed: true,
+    index: null,
+    logName: null,
+    source: null,
+    eventId: null,
+    level,
+    date: null,
+    message: src,
+    parsed: false,
   }
 }
 
@@ -112,14 +161,14 @@ export default function Logs() {
       .finally(() => setDetailLoading(false))
   }
 
-  // Auto-refresh logs every 20s
+  // Auto-refresh logs every 15s
   useEffect(() => {
     if (!selected) return
     const iv = setInterval(() => {
       apiFetch(`/api/servers/${selected.id}/detail`)
         .then((d) => setDetail(d.detail || null))
         .catch(() => {})
-    }, 20000)
+    }, 15000)
     return () => clearInterval(iv)
   }, [selected?.id])
 
@@ -139,7 +188,7 @@ export default function Logs() {
       return /warn|timeout|refused|denied|degraded/i.test(text)
     }
     if (levelFilter === 'auth') {
-      return /ssh|sshd|session opened|accepted|auth|sudo/i.test(text)
+      return /ssh|sshd|session opened|accepted|auth|sudo|pam_unix/i.test(text)
     }
     return true
   })
@@ -158,21 +207,21 @@ export default function Logs() {
       key: 'system',
       label: 'System Log',
       color: '#38bdf8',
-      desc: 'Системные события (syslog / messages)',
+      desc: 'Системные события (syslog / journalctl / messages)',
       icon: Terminal,
     },
     {
       key: 'auth',
       label: 'Auth / Security',
       color: '#ef4444',
-      desc: 'Авторизация и сессии (auth.log / secure)',
+      desc: 'Авторизация и сессии (auth.log / sshd / secure)',
       icon: Shield,
     },
     {
       key: 'error',
       label: 'Kernel / Errors',
       color: '#f59e0b',
-      desc: 'Сбои ядра и модулей (kern.log / dmesg)',
+      desc: 'Сбои ядра и ошибки сервисов (kern.log / dmesg)',
       icon: AlertTriangle,
     },
   ]
@@ -210,7 +259,7 @@ export default function Logs() {
                 </h1>
               </div>
               <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0 0' }}>
-                Потоковый просмотр журналов syslog, dmesg, auth.log и событий ОС в реальном времени
+                Потоковый просмотр журналов syslog, journalctl, dmesg, auth.log и Windows Event Logs в реальном времени
               </p>
             </div>
 
@@ -575,10 +624,9 @@ export default function Logs() {
                         {filteredEntries.map((entry, i) => {
                           const rowKey = `${logTab}-${selected?.id || 'none'}-${i}`
                           const expanded = !!expandedRows[rowKey]
-                          const levelSrc = `${entry.level || ''} ${entry.message || ''}`
-                          const isError = /error|fail|crit|panic|emergency|fatal/i.test(levelSrc)
-                          const isWarn = /warn|timeout|refused|denied|degraded/i.test(levelSrc)
-                          const isAuth = /ssh|sshd|session opened|accepted|sudo/i.test(levelSrc)
+                          const isError = entry.level === 'Error' || /error|fail|crit|panic|emergency|fatal/i.test(entry.raw)
+                          const isWarn = entry.level === 'Warning' || /warn|timeout|refused|denied|degraded/i.test(entry.raw)
+                          const isAuth = entry.level === 'Auth' || /ssh|sshd|session opened|accepted|sudo/i.test(entry.raw)
 
                           const color = isError
                             ? '#ef4444'
@@ -641,8 +689,8 @@ export default function Logs() {
                                     [{entry.level}]
                                   </span>
                                 )}
-                                {entry.date && <span>{entry.date}</span>}
-                                {entry.source && <span>src: {entry.source}</span>}
+                                {entry.date && <span style={{ color: '#94a3b8' }}>{entry.date}</span>}
+                                {entry.source && <span style={{ color: '#64748b' }}>src: {entry.source}</span>}
                               </div>
 
                               <div
