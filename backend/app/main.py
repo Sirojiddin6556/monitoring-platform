@@ -2102,7 +2102,15 @@ async def health_check_history(website_id: str = None, limit: int = 50, current_
 
 
 @app.get('/api/alerts')
-async def list_alerts(active_only: bool = False, limit: int = 100, org_id: int = None, current_user: dict = Depends(get_current_user)):
+async def list_alerts(
+    active_only: bool = False,
+    severity: str = None,
+    category: str = None,
+    target_type: str = None,
+    limit: int = 100,
+    org_id: int = None,
+    current_user: dict = Depends(get_current_user)
+):
     limit = min(max(1, limit), 500)  # cap: 1–500
     """Получить алерты, опционально по организации"""
     try:
@@ -2110,6 +2118,12 @@ async def list_alerts(active_only: bool = False, limit: int = 100, org_id: int =
             q = select(AlertModel)
             if active_only:
                 q = q.where(AlertModel.is_active == True)
+            if severity and severity != 'all':
+                q = q.where(AlertModel.severity == severity)
+            if category and category != 'all':
+                q = q.where(AlertModel.category == category)
+            if target_type and target_type != 'all':
+                q = q.where(AlertModel.target_type == target_type)
 
             role = current_user.get('role')
             user_org_ids = None if role == 'admin' else current_user.get('org_ids', [])
@@ -2167,6 +2181,52 @@ async def list_alerts(active_only: bool = False, limit: int = 100, org_id: int =
         if active_only:
             items = [a for a in items if a.get('is_active')]
         return {'alerts': list(reversed(items))}
+
+
+class BulkResolveRequest(BaseModel):
+    alert_ids: list[int] = []
+
+
+@app.post('/api/alerts/bulk-resolve')
+async def bulk_resolve_alerts_endpoint(data: BulkResolveRequest, current_user: dict = Depends(get_current_user)):
+    """Массово разрешить выбранные алерты"""
+    if not data.alert_ids:
+        return {'message': 'Алерты не указаны', 'resolved_count': 0}
+    async with db.get_session() as session:
+        res = await session.execute(
+            select(AlertModel).where(AlertModel.id.in_(data.alert_ids), AlertModel.is_active == True)
+        )
+        alerts = res.scalars().all()
+        now = datetime.datetime.utcnow()
+        count = 0
+        for alert in alerts:
+            alert.is_active = False
+            alert.resolved_at = now
+            key = f"{alert.target_type}:{alert.target_id}:{alert.metric_key or alert.title}"
+            ACTIVE_ALERT_KEYS.discard(key)
+            count += 1
+        await session.commit()
+        return {'message': f'Разрешено {count} алертов', 'resolved_count': count}
+
+
+@app.post('/api/alerts/resolve-all')
+async def resolve_all_alerts_endpoint(current_user: dict = Depends(get_current_user)):
+    """Разрешить все активные алерты"""
+    async with db.get_session() as session:
+        res = await session.execute(
+            select(AlertModel).where(AlertModel.is_active == True)
+        )
+        alerts = res.scalars().all()
+        now = datetime.datetime.utcnow()
+        count = 0
+        for alert in alerts:
+            alert.is_active = False
+            alert.resolved_at = now
+            key = f"{alert.target_type}:{alert.target_id}:{alert.metric_key or alert.title}"
+            ACTIVE_ALERT_KEYS.discard(key)
+            count += 1
+        await session.commit()
+        return {'message': f'Все активные алерты ({count}) разрешены', 'resolved_count': count}
 
 
 @app.post('/api/alerts/{alert_id}/resolve')
