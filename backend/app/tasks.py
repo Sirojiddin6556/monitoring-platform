@@ -103,13 +103,21 @@ def ping_servers(self):
             except Exception:
                 pass
             if status != "ok":
-                for port in [22, 80, 443, 3389, 445, 5177]:
+                for port in [80, 443, 22, 3389, 445, 5177]:
                     try:
                         sock_start = time.time()
-                        with socket.create_connection((srv.host, port), timeout=1.5):
-                            elapsed_ms = round((time.time() - sock_start) * 1000, 2)
-                            status = "ok"
-                            break
+                        sock = socket.create_connection((srv.host, port), timeout=1.5)
+                        if port == 22:
+                            try:
+                                sock.settimeout(0.8)
+                                sock.recv(256)
+                                sock.sendall(b"SSH-2.0-MonitoringProbe\r\n")
+                            except Exception:
+                                pass
+                        sock.close()
+                        elapsed_ms = round((time.time() - sock_start) * 1000, 2)
+                        status = "ok"
+                        break
                     except Exception:
                         continue
 

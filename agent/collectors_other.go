@@ -149,10 +149,21 @@ func collectRecentLogs() RecentLogs {
 		}
 	}
 
+	var filteredErr []string
+	for _, l := range errLogs {
+		if strings.Contains(l, "kex_exchange_identification") || strings.Contains(l, "Connection closed by") || strings.Contains(l, "Disconnected from invalid user") {
+			continue
+		}
+		filteredErr = append(filteredErr, l)
+	}
+	if filteredErr == nil {
+		filteredErr = []string{}
+	}
+
 	return RecentLogs{
 		System: sys,
 		Auth:   auth,
-		Error:  errLogs,
+		Error:  filteredErr,
 	}
 }
 

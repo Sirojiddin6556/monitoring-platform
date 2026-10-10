@@ -556,15 +556,22 @@ async def ping_host(host: str) -> dict:
         pass
 
     # --- 2. TCP connect fallback (если ICMP заблокирован) ---
-    tcp_ports = [445, 3389, 22, 80, 443, 135]
+    tcp_ports = [80, 443, 22, 445, 3389, 135]
     for port in tcp_ports:
         try:
             start = time.time()
-            _, writer = await asyncio.wait_for(
+            reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(host, port),
                 timeout=min(timeout_sec, 3)
             )
             elapsed = round((time.time() - start) * 1000, 2)
+            if port == 22:
+                try:
+                    await asyncio.wait_for(reader.readline(), timeout=0.8)
+                    writer.write(b"SSH-2.0-MonitoringProbe\r\n")
+                    await writer.drain()
+                except Exception:
+                    pass
             writer.close()
             try:
                 await writer.wait_closed()
@@ -636,11 +643,18 @@ async def health_check_protocol(target: str, protocol: str = 'icmp', port: int =
             if port is None:
                 port = 80
             try:
-                _, writer = await asyncio.wait_for(
+                reader, writer = await asyncio.wait_for(
                     asyncio.open_connection(target, port),
                     timeout=min(timeout_sec, 3)
                 )
                 elapsed = round((time.time() - start) * 1000, 2)
+                if port == 22:
+                    try:
+                        await asyncio.wait_for(reader.readline(), timeout=0.8)
+                        writer.write(b"SSH-2.0-MonitoringProbe\r\n")
+                        await writer.drain()
+                    except Exception:
+                        pass
                 writer.close()
                 try:
                     await writer.wait_closed()

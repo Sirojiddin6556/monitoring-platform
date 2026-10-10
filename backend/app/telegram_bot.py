@@ -444,13 +444,20 @@ class MonitoringBot:
         except Exception:
             pass
         # TCP fallback
-        for port in [22, 80, 443, 3389, 445]:
+        for port in [80, 443, 22, 3389, 445]:
             try:
                 start = time.time()
-                _, writer = await asyncio.wait_for(
+                reader, writer = await asyncio.wait_for(
                     asyncio.open_connection(host, port), timeout=3,
                 )
                 elapsed = round((time.time() - start) * 1000, 2)
+                if port == 22:
+                    try:
+                        await asyncio.wait_for(reader.readline(), timeout=0.8)
+                        writer.write(b"SSH-2.0-MonitoringProbe\r\n")
+                        await writer.drain()
+                    except Exception:
+                        pass
                 writer.close()
                 try:
                     await writer.wait_closed()
