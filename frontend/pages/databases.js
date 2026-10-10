@@ -127,6 +127,7 @@ function resolveServerInfo(c, serversList = []) {
 }
 
 export default function Databases() {
+  const [mounted, setMounted] = useState(false)
   const [databases, setDatabases] = useState([])
   const [telemetry, setTelemetry] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -251,6 +252,7 @@ export default function Databases() {
   }, [])
 
   useEffect(() => {
+    setMounted(true)
     loadData()
     const t = setInterval(loadData, 20000)
     return () => clearInterval(t)
@@ -280,11 +282,25 @@ export default function Databases() {
 
   const availableTypes = ['all', ...new Set(databases.map(d => d.type))]
 
+  if (!mounted) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#090d16', color: '#f8fafc' }}>
+        <Sidebar />
+        <div style={{ flex: 1, padding: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: '#64748b', fontSize: 13 }}>
+            <Activity className="animate-spin" size={18} />
+            Загрузка телеметрии СУБД...
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <ProtectedRoute>
-      <div className="app-shell">
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#090d16', color: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
         <Sidebar />
-        <div className="page">
+        <div style={{ flex: 1, padding: '20px 28px', height: '100vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
           {/* Strict Enterprise Breadcrumb Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
             <div>

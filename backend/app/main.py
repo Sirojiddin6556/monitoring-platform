@@ -2229,6 +2229,97 @@ async def resolve_all_alerts_endpoint(current_user: dict = Depends(get_current_u
         return {'message': f'Все активные алерты ({count}) разрешены', 'resolved_count': count}
 
 
+class SSLCheckRequest(BaseModel):
+    host: str
+    port: int = 443
+
+
+@app.post('/api/ssl/check')
+async def check_ssl_endpoint(data: SSLCheckRequest, current_user: dict = Depends(get_current_user)):
+    """Проверить SSL сертификат любого хоста или сайта онлайн"""
+    import ssl, socket, datetime
+    import cryptography.x509 as x509
+    host = data.host.strip()
+    if host.startswith('https://'):
+        host = host.replace('https://', '')
+    if host.startswith('http://'):
+        host = host.replace('http://', '')
+    if '/' in host:
+        host = host.split('/')[0]
+    if ':' in host:
+        parts = host.split(':')
+        host = parts[0]
+        try:
+            port = int(parts[1])
+        except Exception:
+            port = 443
+    else:
+        port = data.port
+
+    loop = asyncio.get_event_loop()
+
+    def _check():
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((host, port), timeout=6) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                der = ssock.getpeercert(binary_form=True)
+                cipher = ssock.cipher()
+                tls_version = ssock.version()
+                return der, cipher, tls_version
+
+    try:
+        der, cipher, tls_version = await loop.run_in_executor(None, _check)
+        cert = x509.load_der_x509_certificate(der)
+        not_before = getattr(cert, 'not_valid_before_utc', getattr(cert, 'not_valid_before', None))
+        not_after = getattr(cert, 'not_valid_after_utc', getattr(cert, 'not_valid_after', None))
+        
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if hasattr(not_after, 'tzinfo') and not_after.tzinfo is None:
+            now = datetime.datetime.utcnow()
+            
+        days_left = (not_after - now).days if not_after else None
+        
+        # Clean Issuer & Subject
+        issuer_str = cert.issuer.rfc4514_string()
+        subject_str = cert.subject.rfc4514_string()
+        
+        # Extract CN or Org
+        common_name = host
+        for attr in cert.subject:
+            if attr.oid._name == 'commonName':
+                common_name = attr.value
+                break
+
+        issuer_org = 'Self-signed / Generic'
+        for attr in cert.issuer:
+            if attr.oid._name in ('organizationName', 'commonName'):
+                issuer_org = attr.value
+                break
+        
+        return {
+            'host': host,
+            'port': port,
+            'status': 'valid' if (days_left is not None and days_left > 0) else ('expired' if days_left is not None else 'unknown'),
+            'days_left': days_left,
+            'not_after': not_after.isoformat() if not_after else None,
+            'not_before': not_before.isoformat() if not_before else None,
+            'subject': common_name,
+            'issuer': issuer_org,
+            'tls_version': tls_version,
+            'cipher': cipher[0] if cipher else None,
+            'serial': str(cert.serial_number)
+        }
+    except Exception as e:
+        return {
+            'host': host,
+            'port': port,
+            'status': 'error',
+            'error': str(e)
+        }
+
+
 @app.post('/api/alerts/{alert_id}/resolve')
 async def resolve_alert_endpoint(alert_id: int, current_user: dict = Depends(get_current_user)):
     """Вручную разрешить алерт"""
