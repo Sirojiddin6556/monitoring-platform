@@ -317,6 +317,7 @@ function WidgetCard({ widget, onEdit, onDelete }) {
 }
 
 export default function DashboardDetail() {
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { id } = router.query
 
@@ -338,6 +339,7 @@ export default function DashboardDetail() {
   }
 
   useEffect(() => {
+    setMounted(true)
     if (id) load()
   }, [id])
 
@@ -360,6 +362,8 @@ export default function DashboardDetail() {
       alert(err.message)
     }
   }
+
+  if (!mounted) return null
 
   return (
     <ProtectedRoute>

@@ -1,9 +1,10 @@
-import {useState} from 'react'
-import {useRouter} from 'next/router'
+import { useState } from 'react'
+import { useRouter } from 'next/router'
 import Link from 'next/link'
 import apiFetch from '../../lib/api'
+import { Activity, Lock, Mail, User } from 'lucide-react'
 
-export default function Register(){
+export default function Register() {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -16,133 +17,236 @@ export default function Register(){
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
-    if(password !== confirmPassword){ setError('Пароли не совпадают'); return }
-    if(password.length < 8){ setError('Пароль должен быть не менее 8 символов'); return }
+    if (password !== confirmPassword) {
+      setError('Введенные пароли не совпадают')
+      return
+    }
+    if (password.length < 8) {
+      setError('Пароль должен содержать не менее 8 символов')
+      return
+    }
     setLoading(true)
     try {
       const res = await apiFetch('/api/auth/register', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({email, username, password})
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, username, password }),
       })
-      if(res.id){
+      if (res.id) {
         setSuccess(true)
-        setTimeout(() => router.push('/auth/login'), 2000)
+        setTimeout(() => router.push('/auth/login'), 1800)
       } else {
-        setError(res.detail || 'Ошибка регистрации')
+        setError(res.detail || 'Ошибка создания учетной записи')
       }
-    } catch(err){
+    } catch (err) {
       setError('Ошибка сети: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const inputStyle = {
-    width:'100%', padding:'10px 12px',
-    border:'1px solid #1c1c3e', borderRadius:8,
-    background:'#0b0b1e', color:'#e2e4f0',
-    fontSize:14, outline:'none', fontFamily:'inherit',
-    transition:'border-color 0.18s',
-  }
-  const onFocus = e => { e.target.style.borderColor='rgba(99,102,241,0.5)'; e.target.style.boxShadow='0 0 0 3px rgba(99,102,241,0.1)' }
-  const onBlur  = e => { e.target.style.borderColor='#1c1c3e'; e.target.style.boxShadow='none' }
-
   return (
-    <div style={{
-      display:'flex', justifyContent:'center', alignItems:'center',
-      minHeight:'100vh',
-      background:'radial-gradient(ellipse 120% 80% at 60% -10%, #1a0a3a 0%, #07071a 55%, #030310 100%)',
-    }}>
-      <div style={{
-        width:'100%', maxWidth:380,
-        padding:36,
-        background:'linear-gradient(135deg, rgba(13,13,36,0.98) 0%, rgba(11,11,30,0.96) 100%)',
-        borderRadius:16,
-        border:'1px solid rgba(130,130,220,0.12)',
-        boxShadow:'0 24px 64px rgba(0,0,0,0.6), 0 0 80px rgba(99,102,241,0.05)',
-      }}>
-        {/* Logo */}
-        <div style={{textAlign:'center', marginBottom:28}}>
-          <div style={{
-            display:'inline-flex', alignItems:'center', justifyContent:'center',
-            width:44, height:44,
-            background:'linear-gradient(135deg, #6366f1, #4f46e5)',
-            borderRadius:12, fontSize:20, marginBottom:12,
-            boxShadow:'0 0 20px rgba(99,102,241,0.4)',
-          }}>⬡</div>
-          <div style={{fontSize:20, fontWeight:700, color:'#e2e4f0', letterSpacing:-0.3}}>Monitoring</div>
-          <div style={{fontSize:12, color:'#6272a4', marginTop:4}}>Создайте аккаунт</div>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: '#090d16',
+        padding: 20,
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          padding: '36px 32px',
+          background: '#101726',
+          borderRadius: 12,
+          border: '1px solid #1e293b',
+          boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.7)',
+        }}
+      >
+        {/* Brand */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 44,
+              height: 44,
+              background: '#2563eb18',
+              border: '1px solid #2563eb40',
+              borderRadius: 10,
+              color: '#38bdf8',
+              marginBottom: 14,
+            }}
+          >
+            <Activity size={22} />
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+            Создание аккаунта
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+            Регистрация оператора в платформе мониторинга
+          </div>
         </div>
 
         {error && (
-          <div style={{
-            padding:'10px 14px', marginBottom:14,
-            background:'rgba(244,63,94,0.1)', color:'#f87171',
-            border:'1px solid rgba(244,63,94,0.25)',
-            borderRadius:8, fontSize:13,
-          }}>{error}</div>
+          <div
+            style={{
+              padding: '10px 14px',
+              marginBottom: 18,
+              background: '#ef444415',
+              color: '#f87171',
+              border: '1px solid #ef444435',
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+          >
+            {error}
+          </div>
         )}
 
         {success && (
-          <div style={{
-            padding:'10px 14px', marginBottom:14,
-            background:'rgba(34,197,94,0.1)', color:'#4ade80',
-            border:'1px solid rgba(34,197,94,0.25)',
-            borderRadius:8, fontSize:13,
-          }}>Регистрация успешна! Перенаправляем...</div>
+          <div
+            style={{
+              padding: '10px 14px',
+              marginBottom: 18,
+              background: '#10b98115',
+              color: '#34d399',
+              border: '1px solid #10b98135',
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+          >
+            Учетная запись создана! Перенаправляем на вход...
+          </div>
         )}
 
         {!success && (
-          <form onSubmit={handleSubmit} style={{display:'flex', flexDirection:'column', gap:14}}>
-            {[
-              {label:'Email', type:'email', val:email, set:setEmail, ph:'you@example.com'},
-              {label:'Имя пользователя', type:'text', val:username, set:setUsername, ph:'username', min:3},
-              {label:'Пароль', type:'password', val:password, set:setPassword, ph:'••••••••', min:8},
-              {label:'Подтвердить пароль', type:'password', val:confirmPassword, set:setConfirmPassword, ph:'••••••••'},
-            ].map(f => (
-              <div key={f.label}>
-                <label style={{display:'block', marginBottom:5, color:'#8892a8', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:0.4}}>
-                  {f.label}
-                </label>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={14} style={iconStyle} />
                 <input
-                  type={f.type} value={f.val} required
-                  minLength={f.min}
-                  placeholder={f.ph}
-                  onChange={e => f.set(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="operator@company.com"
                   style={inputStyle}
-                  onFocus={onFocus} onBlur={onBlur}
                 />
               </div>
-            ))}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Имя пользователя</label>
+              <div style={{ position: 'relative' }}>
+                <User size={14} style={iconStyle} />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  minLength={3}
+                  placeholder="operator1"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Пароль</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={14} style={iconStyle} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  placeholder="Минимум 8 символов"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Подтверждение пароля</label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={14} style={iconStyle} />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Повторите пароль"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
 
             <button
-              type="submit" disabled={loading}
+              type="submit"
+              disabled={loading}
               style={{
-                marginTop:4,
-                padding:'11px 16px',
-                background: loading ? '#2a2a50' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                color:'#fff', border:'none', borderRadius:8,
-                fontSize:14, fontWeight:600,
+                marginTop: 6,
+                padding: '10px 16px',
+                background: loading ? '#1e293b' : '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 6,
+                fontSize: 13,
+                fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.65 : 1,
-                fontFamily:'inherit',
-                boxShadow: loading ? 'none' : '0 0 16px rgba(99,102,241,0.3)',
-                transition:'all 0.18s',
+                transition: 'background 0.15s ease',
               }}
             >
-              {loading ? 'Загрузка...' : 'Зарегистрироваться'}
+              {loading ? 'Создание...' : 'Зарегистрироваться'}
             </button>
           </form>
         )}
 
-        <div style={{marginTop:20, textAlign:'center', color:'#6272a4', fontSize:13}}>
-          Уже есть аккаунт?{' '}
-          <Link href="/auth/login" style={{color:'#818cf8', textDecoration:'none', fontWeight:600}}>
-            Войдите
+        <div style={{ marginTop: 24, textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+          Уже зарегистрированы?{' '}
+          <Link href="/auth/login" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600 }}>
+            Войти в систему
           </Link>
         </div>
       </div>
     </div>
   )
+}
+
+const labelStyle = {
+  display: 'block',
+  marginBottom: 5,
+  color: '#94a3b8',
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+}
+
+const iconStyle = {
+  position: 'absolute',
+  left: 12,
+  top: 12,
+  color: '#64748b',
+}
+
+const inputStyle = {
+  width: '100%',
+  padding: '9px 12px 9px 34px',
+  border: '1px solid #1e293b',
+  borderRadius: 6,
+  background: '#090d16',
+  color: '#f8fafc',
+  fontSize: 13,
+  outline: 'none',
+  boxSizing: 'border-box',
 }
