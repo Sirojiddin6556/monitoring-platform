@@ -1,6 +1,6 @@
 _SLA_SUMMARY_CACHE = None
 _SLA_SUMMARY_CACHE_TIME = 0
-_SLA_CACHE_TTL = 60  # seconds
+_SLA_CACHE_TTL = 300  # seconds
 
 """SLA / Uptime tracker router — Sprint 3.
 
@@ -247,6 +247,7 @@ async def _compute_server_uptimes(
                 COUNT(*) FILTER (WHERE received_at >= :since_24h AND (payload ->> 'status') IN ('ok', 'up'))
             FROM metrics
             WHERE server_id = :target_id 
+              AND metric_name = 'ping'
               AND received_at >= :since_30d 
               AND received_at <= :now
         """)
@@ -377,6 +378,7 @@ async def _compute_uptime(session, target_type: str, target_id: str, since, unti
                 COUNT(*) FILTER (WHERE (payload ->> 'status') IN ('ok', 'up'))
             FROM metrics
             WHERE server_id = :target_id 
+              AND metric_name = 'ping'
               AND received_at >= :since 
               AND received_at <= :until
         """)
