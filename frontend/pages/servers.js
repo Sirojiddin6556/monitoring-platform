@@ -2,7 +2,7 @@ import {useEffect, useState, useMemo, useRef, useCallback} from 'react'
 import Link from 'next/link'
 import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line, BarChart, Bar, Legend } from 'recharts'
 import TimeRangeFilter from '../components/TimeRangeFilter'
 import apiFetch from '../lib/api'
 import {
@@ -27,7 +27,19 @@ import {
   Terminal,
   ArrowUpRight,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  BarChart2,
+  TrendingUp,
+  Grid,
+  Layers,
+  Sparkles,
+  Filter,
+  Check,
+  Eye,
+  EyeOff,
+  LayoutGrid
 } from 'lucide-react'
 
 
@@ -43,24 +55,29 @@ function StatusBadge({status}){
 }
 
 function GaugeRing({value, max=100, color='#2563eb', label, unit='%', size=80}) {
-  const pct = Math.min(value/max*100, 100)
-  const r = (size-10)/2
-  const circ = 2*Math.PI*r
-  const offset = circ - (pct/100)*circ
+  const numVal = typeof value === 'number' ? value : Number(value) || 0
+  const pct = Math.min(Math.max(numVal / max * 100, 0), 100)
+  const r = (size - 10) / 2
+  const circ = 2 * Math.PI * r
+  const offset = circ - (pct / 100) * circ
   const warn = pct > 80 ? '#ef4444' : pct > 60 ? '#facc15' : color
   return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
-      <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1e293b" strokeWidth={6}/>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={warn} strokeWidth={6}
-          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{transition:'stroke-dashoffset 0.6s ease, stroke 0.3s'}}/>
-      </svg>
-      <div style={{marginTop:-size/2-8,textAlign:'center',position:'relative'}}>
-        <div style={{fontSize:size>70?18:14,fontWeight:700,color:'#fff'}}>{typeof value==='number'?value.toFixed(value<10?1:0):value}</div>
-        <div style={{fontSize:9,color:'#9aa4b2'}}>{unit}</div>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,position:'relative'}}>
+      <div style={{position:'relative',width:size,height:size}}>
+        <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1e293b" strokeWidth={6}/>
+          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={warn} strokeWidth={6}
+            strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+            style={{transition:'stroke-dashoffset 0.6s ease, stroke 0.3s'}}/>
+        </svg>
+        <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center'}}>
+          <div style={{fontSize:size>70?16:13,fontWeight:700,color:'#fff',lineHeight:1.1}}>
+            {typeof value==='number'?value.toFixed(value<10 && value%1!==0 ?1:0):value}
+          </div>
+          {unit && <div style={{fontSize:9,color:'#94a3b8',marginTop:1}}>{unit}</div>}
+        </div>
       </div>
-      <div style={{fontSize:10,color:'#9aa4b2',marginTop:size>70?12:8}}>{label}</div>
+      <div style={{fontSize:11,fontWeight:600,color:'#cbd5e1'}}>{label}</div>
     </div>
   )
 }
@@ -82,62 +99,492 @@ function MiniChart({data, dataKey, color='#2563eb', height=60}) {
   )
 }
 
-function BigChart({data, dataKey, color, title, unit, height=200}) {
-  if(!data||data.length===0) return (
-    <div className="card" style={{padding:16}}>
-      <h4 style={{margin:0,fontSize:13,color:'#9aa4b2'}}>{title}</h4>
-      <div style={{height,display:'flex',alignItems:'center',justifyContent:'center',color:'#9aa4b2'}}>Нет данных</div>
+function getSeriesStats(data, key) {
+  if (!data || !data.length) return null
+  let min = Infinity, max = -Infinity, sum = 0, count = 0, last = null
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i][key]
+    if (typeof v === 'number' && !isNaN(v)) {
+      if (v < min) min = v
+      if (v > max) max = v
+      sum += v
+      count++
+      last = v
+    }
+  }
+  if (count === 0) return null
+  return { last, avg: sum / count, max, min: min === Infinity ? 0 : min }
+}
+
+function CustomChartTooltip({active, payload, label, unit, labelKey, color}) {
+  if (!active || !payload || !payload.length) return null
+  const val = payload[0].value
+  return (
+    <div style={{background:'#090d16',border:`1px solid ${color || '#2563eb'}`,borderRadius:6,padding:'8px 12px',boxShadow:'0 8px 24px rgba(0,0,0,0.6)',minWidth:120}}>
+      <div style={{fontSize:10,color:'#94a3b8',marginBottom:4}}>{label}</div>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{width:8,height:8,borderRadius:'50%',background:color||'#2563eb'}}/>
+        <span style={{fontSize:12,fontWeight:600,color:'#fff'}}>{labelKey}:</span>
+        <span style={{fontSize:13,fontWeight:700,color:color||'#38bdf8'}}>
+          {typeof val === 'number' ? val.toFixed(val < 10 && val % 1 !== 0 ? 2 : 1) : val} {unit}
+        </span>
+      </div>
     </div>
   )
+}
+
+function CustomDualTooltip({active, payload, label, unit, label1, label2, color1, color2, key1, key2}) {
+  if (!active || !payload || !payload.length) return null
   return (
-    <div className="card" style={{padding:16}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-        <h4 style={{margin:0,fontSize:13,color:'#fff'}}>{title}</h4>
-        <span style={{fontSize:11,color:'#9aa4b2'}}>{data.length} точек</span>
+    <div style={{background:'#090d16',border:'1px solid #1e293b',borderRadius:6,padding:'8px 12px',boxShadow:'0 8px 24px rgba(0,0,0,0.6)',minWidth:150}}>
+      <div style={{fontSize:10,color:'#94a3b8',marginBottom:6}}>{label}</div>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {payload.map((p, idx) => {
+          const isFirst = p.dataKey === key1
+          const c = isFirst ? color1 : color2
+          const lbl = isFirst ? label1 : label2
+          return (
+            <div key={idx} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:c}}/>
+                <span style={{fontSize:11,color:'#cbd5e1'}}>{lbl}:</span>
+              </div>
+              <span style={{fontSize:12,fontWeight:700,color:c}}>
+                {typeof p.value === 'number' ? p.value.toFixed(p.value < 10 && p.value % 1 !== 0 ? 2 : 1) : p.value} {unit}
+              </span>
+            </div>
+          )
+        })}
       </div>
-      <div style={{height}}>
+    </div>
+  )
+}
+
+function CustomMultiTooltip({active, payload, label, seriesMeta}) {
+  if (!active || !payload || !payload.length) return null
+  return (
+    <div style={{background:'#090d16',border:'1px solid #1e293b',borderRadius:6,padding:'8px 12px',boxShadow:'0 8px 24px rgba(0,0,0,0.6)',minWidth:160}}>
+      <div style={{fontSize:10,color:'#94a3b8',marginBottom:6}}>{label}</div>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {payload.map((p, idx) => {
+          const meta = (seriesMeta || []).find(s => s.key === p.dataKey) || {}
+          return (
+            <div key={idx} style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:meta.color || '#fff'}}/>
+                <span style={{fontSize:11,color:'#cbd5e1'}}>{meta.label || p.dataKey}:</span>
+              </div>
+              <span style={{fontSize:12,fontWeight:700,color:meta.color || '#fff'}}>
+                {typeof p.value === 'number' ? p.value.toFixed(1) : p.value} {meta.unit || ''}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function BigChart({
+  data,
+  dataKey,
+  color = '#2563eb',
+  title,
+  unit = '',
+  height = 180,
+  defaultChartType = 'area',
+  onMaximize = null,
+  showControls = true,
+}) {
+  const [chartType, setChartType] = useState(defaultChartType)
+  const stats = useMemo(() => getSeriesStats(data, dataKey), [data, dataKey])
+
+  useEffect(() => {
+    if (defaultChartType) setChartType(defaultChartType)
+  }, [defaultChartType])
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="card" style={{padding:16,display:'flex',flexDirection:'column',justifyContent:'space-between',minHeight:height+50}}>
+        <h4 style={{margin:0,fontSize:13,color:'#94a3b8',fontWeight:600}}>{title}</h4>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#64748b',fontSize:12,flex:1}}>
+          Нет данных за выбранный период
+        </div>
+      </div>
+    )
+  }
+
+  const gradId = `bg-${dataKey}-${color.replace('#','')}`
+
+  return (
+    <div className="card" style={{padding:'12px 14px',display:'flex',flexDirection:'column',gap:8,background:'#101726',border:'1px solid #1e293b'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <h4 style={{margin:0,fontSize:13,fontWeight:600,color:'#fff'}}>{title}</h4>
+            {stats && (
+              <span style={{fontSize:11,fontWeight:700,color:color,background:`${color}18`,padding:'1px 6px',borderRadius:4,border:`1px solid ${color}33`}}>
+                {stats.last != null ? stats.last.toFixed(stats.last < 10 && stats.last % 1 !== 0 ? 2 : 1) : '—'} {unit}
+              </span>
+            )}
+          </div>
+          {stats && (
+            <div style={{display:'flex',gap:8,marginTop:3,fontSize:10,color:'#94a3b8'}}>
+              <span>Ср: <strong style={{color:'#cbd5e1'}}>{stats.avg.toFixed(1)}</strong></span>
+              <span>Пик: <strong style={{color: stats.max > 80 && unit === '%' ? '#f87171' : '#cbd5e1'}}>{stats.max.toFixed(1)}</strong></span>
+              <span>Мин: <strong style={{color:'#94a3b8'}}>{stats.min.toFixed(1)}</strong></span>
+            </div>
+          )}
+        </div>
+        {showControls && (
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <div style={{display:'inline-flex',background:'#090d16',borderRadius:6,border:'1px solid #1e293b',padding:2}}>
+              {['area', 'line', 'bar'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setChartType(t)}
+                  title={t === 'area' ? 'Область (Area)' : t === 'line' ? 'Линии (Line)' : 'Столбцы (Bar)'}
+                  style={{
+                    background: chartType === t ? '#1e293b' : 'transparent',
+                    border: 'none',
+                    color: chartType === t ? '#38bdf8' : '#64748b',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                  }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            {onMaximize && (
+              <button
+                onClick={onMaximize}
+                title="Развернуть график"
+                style={{
+                  background: '#090d16',
+                  border: '1px solid #1e293b',
+                  color: '#94a3b8',
+                  padding: '3px 6px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}>
+                <Maximize2 size={11}/>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{height, width:'100%', minWidth:0}}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{top:8,right:12,left:0,bottom:0}}>
-            <defs>
-              <linearGradient id={`bg-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity={0.6}/>
-                <stop offset="100%" stopColor={color} stopOpacity={0.03}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/>
-            <XAxis dataKey="time" tick={{fill:'#9aa4b2',fontSize:10}} interval="preserveStartEnd"/>
-            <YAxis tick={{fill:'#9aa4b2',fontSize:10}} width={40}/>
-            <Tooltip contentStyle={{background:'#101726',border:`1px solid ${color}`,borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
-              formatter={(v)=>[`${typeof v==='number'?v.toFixed(2):v} ${unit}`, title]}/>
-            <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#bg-${dataKey})`} isAnimationActive={false} dot={false} connectNulls={true}/>
-          </AreaChart>
+          {chartType === 'line' ? (
+            <LineChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} domain={unit==='%' ? [0, 100] : ['auto', 'auto']} width={32}/>
+              <Tooltip content={<CustomChartTooltip unit={unit} labelKey={title} color={color}/>}/>
+              <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2.2} dot={false} isAnimationActive={false} connectNulls={true}/>
+            </LineChart>
+          ) : chartType === 'bar' ? (
+            <BarChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} domain={unit==='%' ? [0, 100] : ['auto', 'auto']} width={32}/>
+              <Tooltip content={<CustomChartTooltip unit={unit} labelKey={title} color={color}/>}/>
+              <Bar dataKey={dataKey} fill={color} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            </BarChart>
+          ) : (
+            <AreaChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <defs>
+                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.45}/>
+                  <stop offset="100%" stopColor={color} stopOpacity={0.02}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} domain={unit==='%' ? [0, 100] : ['auto', 'auto']} width={32}/>
+              <Tooltip content={<CustomChartTooltip unit={unit} labelKey={title} color={color}/>}/>
+              <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#${gradId})`} isAnimationActive={false} dot={false} connectNulls={true}/>
+            </AreaChart>
+          )}
         </ResponsiveContainer>
       </div>
     </div>
   )
 }
 
-function DualLineChart({data, key1, key2, color1, color2, label1, label2, title, unit, height=200}) {
-  if(!data||data.length===0) return null
+function DualLineChart({
+  data,
+  key1,
+  key2,
+  color1 = '#22d3ee',
+  color2 = '#f472b6',
+  label1 = 'Key 1',
+  label2 = 'Key 2',
+  title,
+  unit = '',
+  height = 180,
+  defaultChartType = 'area',
+  onMaximize = null,
+  showControls = true,
+}) {
+  const [chartType, setChartType] = useState(defaultChartType)
+  const [visible1, setVisible1] = useState(true)
+  const [visible2, setVisible2] = useState(true)
+
+  const stats1 = useMemo(() => getSeriesStats(data, key1), [data, key1])
+  const stats2 = useMemo(() => getSeriesStats(data, key2), [data, key2])
+
+  useEffect(() => {
+    if (defaultChartType) setChartType(defaultChartType)
+  }, [defaultChartType])
+
+  if (!data || data.length === 0) return null
+
+  const grad1 = `bg-dual-${key1}-${color1.replace('#','')}`
+  const grad2 = `bg-dual-${key2}-${color2.replace('#','')}`
+
   return (
-    <div className="card" style={{padding:16}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-        <h4 style={{margin:0,fontSize:13,color:'#fff'}}>{title}</h4>
-        <div style={{display:'flex',gap:12}}>
-          <span style={{fontSize:10,color:color1}}>● {label1}</span>
-          <span style={{fontSize:10,color:color2}}>● {label2}</span>
+    <div className="card" style={{padding:'12px 14px',display:'flex',flexDirection:'column',gap:8,background:'#101726',border:'1px solid #1e293b'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,flexWrap:'wrap'}}>
+        <div>
+          <h4 style={{margin:0,fontSize:13,fontWeight:600,color:'#fff'}}>{title}</h4>
+          <div style={{display:'flex',gap:8,marginTop:3,flexWrap:'wrap'}}>
+            {stats1 && (
+              <button
+                onClick={() => setVisible1(v => !v)}
+                style={{
+                  background: visible1 ? `${color1}15` : '#1e293b33',
+                  border: `1px solid ${visible1 ? color1 + '44' : '#1e293b'}`,
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  color: visible1 ? color1 : '#64748b',
+                  opacity: visible1 ? 1 : 0.5,
+                }}>
+                <span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:visible1?color1:'#64748b'}}/>
+                <span>{label1}: <strong>{stats1.last != null ? stats1.last.toFixed(stats1.last < 10 && stats1.last % 1 !== 0 ? 2 : 1) : '—'} {unit}</strong> (пик {stats1.max.toFixed(1)})</span>
+              </button>
+            )}
+            {stats2 && (
+              <button
+                onClick={() => setVisible2(v => !v)}
+                style={{
+                  background: visible2 ? `${color2}15` : '#1e293b33',
+                  border: `1px solid ${visible2 ? color2 + '44' : '#1e293b'}`,
+                  borderRadius: 4,
+                  padding: '1px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  color: visible2 ? color2 : '#64748b',
+                  opacity: visible2 ? 1 : 0.5,
+                }}>
+                <span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:visible2?color2:'#64748b'}}/>
+                <span>{label2}: <strong>{stats2.last != null ? stats2.last.toFixed(stats2.last < 10 && stats2.last % 1 !== 0 ? 2 : 1) : '—'} {unit}</strong> (пик {stats2.max.toFixed(1)})</span>
+              </button>
+            )}
+          </div>
+        </div>
+        {showControls && (
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <div style={{display:'inline-flex',background:'#090d16',borderRadius:6,border:'1px solid #1e293b',padding:2}}>
+              {['area', 'line', 'bar'].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setChartType(t)}
+                  style={{
+                    background: chartType === t ? '#1e293b' : 'transparent',
+                    border: 'none',
+                    color: chartType === t ? '#38bdf8' : '#64748b',
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontSize: 9,
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                  }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            {onMaximize && (
+              <button
+                onClick={onMaximize}
+                title="Развернуть график"
+                style={{
+                  background: '#090d16',
+                  border: '1px solid #1e293b',
+                  color: '#94a3b8',
+                  padding: '3px 6px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}>
+                <Maximize2 size={11}/>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={{height, width:'100%', minWidth:0}}>
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === 'line' ? (
+            <LineChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} width={32}/>
+              <Tooltip content={<CustomDualTooltip unit={unit} label1={label1} label2={label2} color1={color1} color2={color2} key1={key1} key2={key2}/>}/>
+              {visible1 && <Line type="monotone" dataKey={key1} stroke={color1} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls={true}/>}
+              {visible2 && <Line type="monotone" dataKey={key2} stroke={color2} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls={true}/>}
+            </LineChart>
+          ) : chartType === 'bar' ? (
+            <BarChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} width={32}/>
+              <Tooltip content={<CustomDualTooltip unit={unit} label1={label1} label2={label2} color1={color1} color2={color2} key1={key1} key2={key2}/>}/>
+              {visible1 && <Bar dataKey={key1} fill={color1} radius={[2, 2, 0, 0]} isAnimationActive={false}/>}
+              {visible2 && <Bar dataKey={key2} fill={color2} radius={[2, 2, 0, 0]} isAnimationActive={false}/>}
+            </BarChart>
+          ) : (
+            <AreaChart data={data} margin={{top:6,right:10,left:-24,bottom:0}}>
+              <defs>
+                <linearGradient id={grad1} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color1} stopOpacity={0.4}/>
+                  <stop offset="100%" stopColor={color1} stopOpacity={0.02}/>
+                </linearGradient>
+                <linearGradient id={grad2} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color2} stopOpacity={0.35}/>
+                  <stop offset="100%" stopColor={color2} stopOpacity={0.02}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+              <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+              <YAxis tick={{fill:'#64748b',fontSize:10}} width={32}/>
+              <Tooltip content={<CustomDualTooltip unit={unit} label1={label1} label2={label2} color1={color1} color2={color2} key1={key1} key2={key2}/>}/>
+              {visible1 && <Area type="monotone" dataKey={key1} stroke={color1} strokeWidth={2} fill={`url(#${grad1})`} isAnimationActive={false} dot={false} connectNulls={true}/>}
+              {visible2 && <Area type="monotone" dataKey={key2} stroke={color2} strokeWidth={2} fill={`url(#${grad2})`} isAnimationActive={false} dot={false} connectNulls={true}/>}
+            </AreaChart>
+          )}
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function MultiMetricChart({
+  data,
+  height = 240,
+  onMaximize = null,
+}) {
+  const [activeSeries, setActiveSeries] = useState({
+    cpu: true,
+    ram: true,
+    disk: true,
+    load1: false,
+    ping: false,
+  })
+
+  const seriesMeta = [
+    {key:'cpu', label:'CPU %', color:'#2563eb', unit:'%'},
+    {key:'ram', label:'RAM %', color:'#00d4ff', unit:'%'},
+    {key:'disk', label:'Диск %', color:'#facc15', unit:'%'},
+    {key:'load1', label:'Load 1m', color:'#a78bfa', unit:''},
+    {key:'ping', label:'Пинг', color:'#4ade80', unit:'мс'},
+  ]
+
+  const toggle = (k) => setActiveSeries(prev => ({...prev, [k]: !prev[k]}))
+
+  return (
+    <div className="card" style={{padding:'14px 16px',display:'flex',flexDirection:'column',gap:10,background:'#101726',border:'1px solid #1e293b'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <h4 style={{margin:0,fontSize:14,fontWeight:700,color:'#fff'}}>Сводный монитор ресурсов</h4>
+            <span style={{fontSize:11,color:'#64748b'}}>Единая шкала ресурсов</span>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          {seriesMeta.map(s => {
+            const isActive = activeSeries[s.key]
+            return (
+              <button
+                key={s.key}
+                onClick={() => toggle(s.key)}
+                style={{
+                  background: isActive ? `${s.color}22` : '#090d16',
+                  border: `1px solid ${isActive ? s.color + '66' : '#1e293b'}`,
+                  borderRadius: 6,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: isActive ? s.color : '#64748b',
+                  transition: 'all 0.15s ease',
+                }}>
+                <span style={{width:7,height:7,borderRadius:'50%',background:isActive?s.color:'#64748b'}}/>
+                <span>{s.label}</span>
+              </button>
+            )
+          })}
+          {onMaximize && (
+            <button
+              onClick={onMaximize}
+              title="Развернуть график"
+              style={{
+                background: '#090d16',
+                border: '1px solid #1e293b',
+                color: '#94a3b8',
+                padding: '4px 6px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+              }}>
+              <Maximize2 size={12}/>
+            </button>
+          )}
         </div>
       </div>
-      <div style={{height}}>
+      <div style={{height, width:'100%'}}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{top:8,right:12,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/>
-            <XAxis dataKey="time" tick={{fill:'#9aa4b2',fontSize:10}} interval="preserveStartEnd"/>
-            <YAxis tick={{fill:'#9aa4b2',fontSize:10}} width={40}/>
-            <Tooltip contentStyle={{background:'#101726',border:'1px solid #1e293b',borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
-              formatter={(v,name)=>[`${typeof v==='number'?v.toFixed(2):v} ${unit}`, name===key1?label1:label2]}/>
-            <Line type="monotone" dataKey={key1} stroke={color1} strokeWidth={2} dot={false} isAnimationActive={false}/>
-            <Line type="monotone" dataKey={key2} stroke={color2} strokeWidth={2} dot={false} isAnimationActive={false}/>
+          <LineChart data={data} margin={{top:6,right:10,left:-20,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.6}/>
+            <XAxis dataKey="time" tick={{fill:'#64748b',fontSize:10}} interval="preserveStartEnd" minTickGap={30}/>
+            <YAxis tick={{fill:'#64748b',fontSize:10}} width={35}/>
+            <Tooltip content={<CustomMultiTooltip seriesMeta={seriesMeta}/>}/>
+            {seriesMeta.map(s => (
+              activeSeries[s.key] ? (
+                <Line
+                  key={s.key}
+                  type="monotone"
+                  dataKey={s.key}
+                  stroke={s.color}
+                  strokeWidth={2.2}
+                  dot={false}
+                  isAnimationActive={false}
+                  connectNulls={true}
+                />
+              ) : null
+            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -279,6 +726,11 @@ export default function Servers() {
   const [selectedKeyLoading, setSelectedKeyLoading] = useState(false)
   const [serverUptime, setServerUptime] = useState(null)
   const [showAgentKeysModal, setShowAgentKeysModal] = useState(false)
+  const [overviewChartFilter, setOverviewChartFilter] = useState('all')
+  const [overviewGridColumns, setOverviewGridColumns] = useState(2)
+  const [globalChartType, setGlobalChartType] = useState('area')
+  const [zoomedChart, setZoomedChart] = useState(null)
+  const [showMiniMetrics, setShowMiniMetrics] = useState(true)
 
   useEffect(() => { selectedRef.current = selected }, [selected])
   useEffect(() => { timeRangeRef.current = timeRange }, [timeRange])
@@ -322,7 +774,7 @@ export default function Servers() {
     setLoading(true); setError(null)
     try {
       const d = await apiFetch('/api/servers')
-      setServers((d.servers || []).map(s => {
+      const mapped = (d.servers || []).map(s => {
         const lastMetrics = normalizeMetrics(s.last_metrics || {})
         const pingFromMetrics = lastMetrics.ping?.value
         return {
@@ -330,7 +782,11 @@ export default function Servers() {
           last_metrics: lastMetrics,
           last_ping: s.last_ping ?? pingFromMetrics ?? null,
         }
-      }))
+      })
+      setServers(mapped)
+      if (!selectedRef.current && mapped.length > 0) {
+        setSelected(mapped[0])
+      }
       apiFetch('/api/vm/all').then(vd => setVms(vd.vms || [])).catch(() => {})
     } catch(e) { setError('Ошибка загрузки серверов'); setServers([]) }
     finally { setLoading(false) }
@@ -723,27 +1179,258 @@ export default function Servers() {
           )}
         </div>
       )}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:10}}>
-        {MINI_CARDS.map(({label,key,color,unit})=>(
-          <div key={key} className="card" style={{padding:'10px 12px'}}>
-            <div style={{fontSize:10,color:'#9aa4b2',marginBottom:4}}>{label}</div>
-            <div style={{fontSize:20,fontWeight:700,color}}>{curMetrics[key]?.value!=null?typeof curMetrics[key].value==='number'?curMetrics[key].value.toFixed(curMetrics[key].value<10?2:1):curMetrics[key].value:'—'}</div>
-            {unit && <div style={{fontSize:9,color:'#9aa4b2'}}>{unit}</div>}
-            <MiniChart data={chartSeries.slice(-30)} dataKey={key} color={color} height={32}/>
+      {/* Дополнительные оперативные показатели */}
+      <div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{fontSize:11,fontWeight:600,color:'#94a3b8',textTransform:'uppercase',letterSpacing:0.5}}>Оперативные показатели</div>
+          <button
+            onClick={() => setShowMiniMetrics(v => !v)}
+            style={{background:'transparent',border:'none',color:'#64748b',cursor:'pointer',fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}>
+            {showMiniMetrics ? <EyeOff size={12}/> : <Eye size={12}/>}
+            <span>{showMiniMetrics ? 'Скрыть панель' : 'Показать панель'}</span>
+          </button>
+        </div>
+        {showMiniMetrics && (
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:8}}>
+            {MINI_CARDS.map(({label,key,color,unit})=>(
+              <div key={key} className="card" style={{padding:'8px 10px',background:'#101726',border:'1px solid #1e293b'}}>
+                <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>{label}</div>
+                <div style={{fontSize:17,fontWeight:700,color}}>{curMetrics[key]?.value!=null?typeof curMetrics[key].value==='number'?curMetrics[key].value.toFixed(curMetrics[key].value<10?2:1):curMetrics[key].value:'—'}</div>
+                {unit && <div style={{fontSize:9,color:'#64748b'}}>{unit}</div>}
+                <MiniChart data={chartSeries.slice(-30)} dataKey={key} color={color} height={26}/>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-        <BigChart data={chartSeries} dataKey="cpu" color="#2563eb" title="CPU %" unit="%" height={180}/>
-        <BigChart data={chartSeries} dataKey="ram" color="#00d4ff" title="RAM %" unit="%" height={180}/>
+
+      {/* ПАНЕЛЬ УПРАВЛЕНИЯ И КОМПАКТИЗАЦИИ ДИАГРАММ */}
+      <div className="card" style={{padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,flexWrap:'wrap',background:'#101726',border:'1px solid #1e293b'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <Activity size={15} style={{color:'#38bdf8'}}/>
+            <span style={{fontSize:13,fontWeight:700,color:'#fff'}}>Телеметрия & Графики</span>
+            <span style={{fontSize:10,color:'#64748b',background:'#090d16',padding:'2px 6px',borderRadius:4,border:'1px solid #1e293b'}}>{chartSeries.length} точек</span>
+          </div>
+
+          {/* Фильтр разделов диаграмм */}
+          <div style={{display:'inline-flex',background:'#090d16',borderRadius:6,border:'1px solid #1e293b',padding:2}}>
+            {[
+              {id:'all', label:'Все графики (6)'},
+              {id:'compute', label:'CPU & RAM'},
+              {id:'network', label:'Сеть & Пинг'},
+              {id:'disk', label:'Диски & IOPS'},
+              {id:'unified', label:'Сводный мульти-график'},
+            ].map(f => (
+              <button
+                key={f.id}
+                onClick={() => setOverviewChartFilter(f.id)}
+                style={{
+                  background: overviewChartFilter === f.id ? '#1e293b' : 'transparent',
+                  border: 'none',
+                  color: overviewChartFilter === f.id ? '#38bdf8' : '#94a3b8',
+                  padding: '4px 9px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: overviewChartFilter === f.id ? 600 : 400,
+                  transition: 'all 0.15s ease',
+                }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {/* Переключатель сетки (Колонки) */}
+          <div style={{display:'inline-flex',background:'#090d16',borderRadius:6,border:'1px solid #1e293b',padding:2}}>
+            <button
+              onClick={() => setOverviewGridColumns(2)}
+              title="2 Колонки (Сбалансированная сетка)"
+              style={{
+                background: overviewGridColumns === 2 ? '#1e293b' : 'transparent',
+                border: 'none',
+                color: overviewGridColumns === 2 ? '#38bdf8' : '#64748b',
+                padding: '3px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 600,
+              }}>
+              2 кол.
+            </button>
+            <button
+              onClick={() => setOverviewGridColumns(3)}
+              title="3 Колонки (Компактный дашборд — все диаграммы в одном экране)"
+              style={{
+                background: overviewGridColumns === 3 ? '#1e293b' : 'transparent',
+                border: 'none',
+                color: overviewGridColumns === 3 ? '#38bdf8' : '#64748b',
+                padding: '3px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 600,
+              }}>
+              3 кол. (Компакт)
+            </button>
+            <button
+              onClick={() => setOverviewGridColumns(1)}
+              title="1 Колонка (Широкие диаграммы)"
+              style={{
+                background: overviewGridColumns === 1 ? '#1e293b' : 'transparent',
+                border: 'none',
+                color: overviewGridColumns === 1 ? '#38bdf8' : '#64748b',
+                padding: '3px 8px',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: 10,
+                fontWeight: 600,
+              }}>
+              1 кол.
+            </button>
+          </div>
+
+          {/* Глобальный тип диаграмм (Area / Line / Bar) */}
+          <div style={{display:'inline-flex',background:'#090d16',borderRadius:6,border:'1px solid #1e293b',padding:2}}>
+            {['area', 'line', 'bar'].map(t => (
+              <button
+                key={t}
+                onClick={() => setGlobalChartType(t)}
+                title={`Переключить графики в режим ${t.toUpperCase()}`}
+                style={{
+                  background: globalChartType === t ? '#1e293b' : 'transparent',
+                  border: 'none',
+                  color: globalChartType === t ? '#38bdf8' : '#64748b',
+                  padding: '3px 7px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                }}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-        <BigChart data={chartSeries} dataKey="ping" color="#4ade80" title="Пинг" unit="мс" height={180}/>
-        <BigChart data={chartSeries} dataKey="disk" color="#facc15" title="Диск %" unit="%" height={180}/>
-      </div>
-      <DualLineChart data={chartSeries} key1="net_in" key2="net_out" color1="#22d3ee" color2="#f472b6" label1="Входящий" label2="Исходящий" title="Сетевой трафик" unit="Mbps" height={180}/>
-      <DualLineChart data={chartSeries} key1="iops_read" key2="iops_write" color1="#fbbf24" color2="#fb923c" label1="Чтение" label2="Запись" title="IOPS" unit="IO/s" height={180}/>
-      <DualLineChart data={chartSeries} key1="load1" key2="load15" color1="#a78bfa" color2="#6366f1" label1="Load 1m" label2="Load 15m" title="Load Average" unit="" height={160}/>
+
+      {/* ОТОБРАЖЕНИЕ ДИАГРАММ */}
+      {overviewChartFilter === 'unified' ? (
+        <MultiMetricChart
+          data={chartSeries}
+          height={320}
+          onMaximize={() => setZoomedChart({type:'multi', title:'Сводный монитор ресурсов'})}
+        />
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: overviewGridColumns === 3 ? 'repeat(3, 1fr)' : overviewGridColumns === 1 ? '1fr' : 'repeat(2, 1fr)',
+          gap: 12,
+        }}>
+          {(overviewChartFilter === 'all' || overviewChartFilter === 'compute') && (
+            <>
+              <BigChart
+                data={chartSeries}
+                dataKey="cpu"
+                color="#2563eb"
+                title="CPU %"
+                unit="%"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'single', dataKey:'cpu', color:'#2563eb', title:'CPU %', unit:'%'})}
+              />
+              <BigChart
+                data={chartSeries}
+                dataKey="ram"
+                color="#00d4ff"
+                title="RAM %"
+                unit="%"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'single', dataKey:'ram', color:'#00d4ff', title:'RAM %', unit:'%'})}
+              />
+            </>
+          )}
+
+          {(overviewChartFilter === 'all' || overviewChartFilter === 'network') && (
+            <>
+              <DualLineChart
+                data={chartSeries}
+                key1="net_in"
+                key2="net_out"
+                color1="#22d3ee"
+                color2="#f472b6"
+                label1="Входящий (In)"
+                label2="Исходящий (Out)"
+                title="Сетевой трафик"
+                unit="Mbps"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'dual', key1:'net_in', key2:'net_out', color1:'#22d3ee', color2:'#f472b6', label1:'Входящий (In)', label2:'Исходящий (Out)', title:'Сетевой трафик', unit:'Mbps'})}
+              />
+              <BigChart
+                data={chartSeries}
+                dataKey="ping"
+                color="#4ade80"
+                title="Пинг (Latency)"
+                unit="мс"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'single', dataKey:'ping', color:'#4ade80', title:'Пинг (Latency)', unit:'мс'})}
+              />
+            </>
+          )}
+
+          {(overviewChartFilter === 'all' || overviewChartFilter === 'disk') && (
+            <>
+              <BigChart
+                data={chartSeries}
+                dataKey="disk"
+                color="#facc15"
+                title="Диск %"
+                unit="%"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'single', dataKey:'disk', color:'#facc15', title:'Диск %', unit:'%'})}
+              />
+              <DualLineChart
+                data={chartSeries}
+                key1="iops_read"
+                key2="iops_write"
+                color1="#fbbf24"
+                color2="#fb923c"
+                label1="Чтение (Read)"
+                label2="Запись (Write)"
+                title="IOPS Диска"
+                unit="IO/s"
+                height={overviewGridColumns === 3 ? 150 : 170}
+                defaultChartType={globalChartType}
+                onMaximize={() => setZoomedChart({type:'dual', key1:'iops_read', key2:'iops_write', color1:'#fbbf24', color2:'#fb923c', label1:'Чтение (Read)', label2:'Запись (Write)', title:'IOPS Диска', unit:'IO/s'})}
+              />
+            </>
+          )}
+
+          {overviewChartFilter === 'compute' && (
+            <DualLineChart
+              data={chartSeries}
+              key1="load1"
+              key2="load15"
+              color1="#a78bfa"
+              color2="#6366f1"
+              label1="Load 1m"
+              label2="Load 15m"
+              title="Load Average"
+              unit=""
+              height={overviewGridColumns === 3 ? 150 : 170}
+              defaultChartType={globalChartType}
+              onMaximize={() => setZoomedChart({type:'dual', key1:'load1', key2:'load15', color1:'#a78bfa', color2:'#6366f1', label1:'Load 1m', label2:'Load 15m', title:'Load Average', unit:''})}
+            />
+          )}
+        </div>
+      )}
     </>)
   }
 
@@ -1686,6 +2373,53 @@ export default function Servers() {
                   <button type="submit" disabled={addLoading} style={{padding:'8px 20px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:addLoading?0.6:1}}>{addLoading?'Добавление...':'Добавить сервер'}</button>
                 </div>
               </form>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Полноэкранный просмотр графика (Zoom Modal) */}
+      {zoomedChart && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',backdropFilter:'blur(6px)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div className="card" style={{width:'100%',maxWidth:960,background:'#101726',border:'1px solid #1e293b',padding:20,borderRadius:12,display:'flex',flexDirection:'column',gap:14,boxShadow:'0 25px 50px -12px rgba(0,0,0,0.7)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <h3 style={{margin:0,fontSize:17,fontWeight:700,color:'#fff'}}>{zoomedChart.title}</h3>
+                <span style={{fontSize:11,color:'#94a3b8'}}>Детальный временной разрез за выбранный интервал ({chartSeries.length} точек)</span>
+              </div>
+              <button
+                onClick={() => setZoomedChart(null)}
+                style={{background:'#1e293b',border:'none',color:'#fff',padding:'6px 14px',borderRadius:6,cursor:'pointer',fontSize:12,fontWeight:600}}>
+                ✕ Закрыть
+              </button>
+            </div>
+            {zoomedChart.type === 'single' ? (
+              <BigChart
+                data={chartSeries}
+                dataKey={zoomedChart.dataKey}
+                color={zoomedChart.color}
+                title={zoomedChart.title}
+                unit={zoomedChart.unit}
+                height={380}
+                defaultChartType={globalChartType}
+                showControls={true}
+              />
+            ) : zoomedChart.type === 'dual' ? (
+              <DualLineChart
+                data={chartSeries}
+                key1={zoomedChart.key1}
+                key2={zoomedChart.key2}
+                color1={zoomedChart.color1}
+                color2={zoomedChart.color2}
+                label1={zoomedChart.label1}
+                label2={zoomedChart.label2}
+                title={zoomedChart.title}
+                unit={zoomedChart.unit}
+                height={380}
+                defaultChartType={globalChartType}
+                showControls={true}
+              />
+            ) : (
+              <MultiMetricChart data={chartSeries} height={380}/>
             )}
           </div>
         </div>
