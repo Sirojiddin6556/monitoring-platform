@@ -5,6 +5,31 @@ import ProtectedRoute from '../components/ProtectedRoute'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line } from 'recharts'
 import TimeRangeFilter from '../components/TimeRangeFilter'
 import apiFetch from '../lib/api'
+import {
+  Activity,
+  Cpu,
+  MemoryStick,
+  HardDrive,
+  Network,
+  Sliders,
+  Power,
+  Boxes,
+  ShieldCheck,
+  FileText,
+  Server,
+  Database,
+  Radio,
+  Lock,
+  Search,
+  Plus,
+  RefreshCw,
+  Clock,
+  Terminal,
+  ArrowUpRight,
+  ExternalLink,
+  ChevronRight
+} from 'lucide-react'
+
 
 function StatusBadge({status}){
   const colors = {ok:'#4ade80', degraded:'#facc15', down:'#ef4444', unknown:'#9aa4b2', active:'#4ade80', inactive:'#ef4444', failed:'#ef4444', running:'#4ade80', exited:'#ef4444', paused:'#facc15'}
@@ -17,7 +42,7 @@ function StatusBadge({status}){
   )
 }
 
-function GaugeRing({value, max=100, color='#6c5ce7', label, unit='%', size=80}) {
+function GaugeRing({value, max=100, color='#2563eb', label, unit='%', size=80}) {
   const pct = Math.min(value/max*100, 100)
   const r = (size-10)/2
   const circ = 2*Math.PI*r
@@ -26,7 +51,7 @@ function GaugeRing({value, max=100, color='#6c5ce7', label, unit='%', size=80}) 
   return (
     <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
       <svg width={size} height={size} style={{transform:'rotate(-90deg)'}}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1a2940" strokeWidth={6}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#1e293b" strokeWidth={6}/>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={warn} strokeWidth={6}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
           style={{transition:'stroke-dashoffset 0.6s ease, stroke 0.3s'}}/>
@@ -40,7 +65,7 @@ function GaugeRing({value, max=100, color='#6c5ce7', label, unit='%', size=80}) 
   )
 }
 
-function MiniChart({data, dataKey, color='#6c5ce7', height=60}) {
+function MiniChart({data, dataKey, color='#2563eb', height=60}) {
   if(!data||data.length<2) return <div style={{height,display:'flex',alignItems:'center',justifyContent:'center',color:'#9aa4b2',fontSize:11}}>—</div>
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -82,7 +107,7 @@ function BigChart({data, dataKey, color, title, unit, height=200}) {
             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/>
             <XAxis dataKey="time" tick={{fill:'#9aa4b2',fontSize:10}} interval="preserveStartEnd"/>
             <YAxis tick={{fill:'#9aa4b2',fontSize:10}} width={40}/>
-            <Tooltip contentStyle={{background:'#071226',border:`1px solid ${color}`,borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
+            <Tooltip contentStyle={{background:'#101726',border:`1px solid ${color}`,borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
               formatter={(v)=>[`${typeof v==='number'?v.toFixed(2):v} ${unit}`, title]}/>
             <Area type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2} fill={`url(#bg-${dataKey})`} isAnimationActive={false} dot={false} connectNulls={true}/>
           </AreaChart>
@@ -109,7 +134,7 @@ function DualLineChart({data, key1, key2, color1, color2, label1, label2, title,
             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.06}/>
             <XAxis dataKey="time" tick={{fill:'#9aa4b2',fontSize:10}} interval="preserveStartEnd"/>
             <YAxis tick={{fill:'#9aa4b2',fontSize:10}} width={40}/>
-            <Tooltip contentStyle={{background:'#071226',border:'1px solid #1a2940',borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
+            <Tooltip contentStyle={{background:'#101726',border:'1px solid #1e293b',borderRadius:6,fontSize:12}} labelStyle={{color:'#9aa4b2'}}
               formatter={(v,name)=>[`${typeof v==='number'?v.toFixed(2):v} ${unit}`, name===key1?label1:label2]}/>
             <Line type="monotone" dataKey={key1} stroke={color1} strokeWidth={2} dot={false} isAnimationActive={false}/>
             <Line type="monotone" dataKey={key2} stroke={color2} strokeWidth={2} dot={false} isAnimationActive={false}/>
@@ -122,7 +147,7 @@ function DualLineChart({data, key1, key2, color1, color2, label1, label2, title,
 
 function InfoRow({label, value, color}) {
   return (
-    <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #1a294040'}}>
+    <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid #1e293b'}}>
       <span style={{fontSize:12,color:'#9aa4b2'}}>{label}</span>
       <span style={{fontSize:12,color:color||'#fff',fontWeight:500}}>{value ?? '—'}</span>
     </div>
@@ -144,18 +169,18 @@ function DataTable({columns, rows, emptyText='Нет данных', searchable=t
     <div style={{overflowX:'auto'}}>
       {searchable && rows.length>3 && (
         <div style={{marginBottom:8}}>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Поиск по таблице..." style={{width:'100%',padding:'6px 10px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:11,outline:'none'}}/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Поиск по таблице..." style={{width:'100%',padding:'6px 10px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:11,outline:'none'}}/>
         </div>
       )}
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
         <thead>
-          <tr>{columns.map(c=><th key={c.key} style={{textAlign:'left',padding:'8px 10px',color:'#9aa4b2',borderBottom:'1px solid #1a2940',fontSize:11,fontWeight:600}}>{c.label}</th>)}</tr>
+          <tr>{columns.map(c=><th key={c.key} style={{textAlign:'left',padding:'8px 10px',color:'#9aa4b2',borderBottom:'1px solid #1e293b',fontSize:11,fontWeight:600}}>{c.label}</th>)}</tr>
         </thead>
         <tbody>
           {filteredRows.length===0 ? (
             <tr><td colSpan={columns.length} style={{padding:16,textAlign:'center',color:'#9aa4b2',fontSize:12}}>Ничего не найдено</td></tr>
           ) : filteredRows.map((r,i)=>(
-            <tr key={i} style={{borderBottom:'1px solid #1a294040'}}>
+            <tr key={i} style={{borderBottom:'1px solid #1e293b'}}>
               {columns.map(c=><td key={c.key} style={{padding:'8px 10px',color:c.color?c.color(r):'#fff'}}>{c.render?c.render(r):r[c.key]??'—'}</td>)}
             </tr>
           ))}
@@ -167,20 +192,20 @@ function DataTable({columns, rows, emptyText='Нет данных', searchable=t
 }
 
 const TABS = [
-  {id:'overview', label:'Обзор', icon:'📊'},
-  {id:'cpu', label:'CPU', icon:'🔧'},
-  {id:'memory', label:'Память', icon:'💾'},
-  {id:'disks', label:'Диски', icon:'💿'},
-  {id:'network', label:'Сеть', icon:'🌐'},
-  {id:'processes', label:'Процессы', icon:'⚙️'},
-  {id:'services', label:'Сервисы', icon:'🔌'},
-  {id:'docker', label:'Docker', icon:'🐳'},
-  {id:'security', label:'Безопасность', icon:'🔐'},
-  {id:'logs', label:'Логи', icon:'📜'},
-  {id:'system', label:'Система', icon:'🖥️'},
-  {id:'databases', label:'БД', icon:'🗄️'},
-  {id:'network_equipment', label:'Сетевое обор.', icon:'📡'},
-  {id:'ssl_certificates', label:'SSL', icon:'🛡️'},
+  {id:'overview', label:'Обзор', icon: Activity},
+  {id:'cpu', label:'CPU', icon: Cpu},
+  {id:'memory', label:'Память', icon: MemoryStick},
+  {id:'disks', label:'Диски', icon: HardDrive},
+  {id:'network', label:'Сеть', icon: Network},
+  {id:'processes', label:'Процессы', icon: Sliders},
+  {id:'services', label:'Сервисы', icon: Power},
+  {id:'docker', label:'Docker', icon: Boxes},
+  {id:'security', label:'Безопасность', icon: ShieldCheck},
+  {id:'logs', label:'Логи', icon: FileText},
+  {id:'system', label:'Система', icon: Server},
+  {id:'databases', label:'БД', icon: Database},
+  {id:'network_equipment', label:'Сетевое обор.', icon: Radio},
+  {id:'ssl_certificates', label:'SSL', icon: Lock},
 ]
 
 const MINI_CARDS = [
@@ -212,6 +237,7 @@ function findMatchedVm(server, vmsList) {
 }
 
 export default function Servers() {
+  const [mounted, setMounted] = useState(false)
   const [servers, setServers] = useState([])
   const [vms, setVms] = useState([])
   const [selected, setSelected] = useState(null)
@@ -310,7 +336,10 @@ export default function Servers() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { loadServers() }, [])
+  useEffect(() => {
+    setMounted(true)
+    loadServers()
+  }, [])
 
   useEffect(() => {
     if (selected?.monitor_type === 'agent') {
@@ -623,7 +652,7 @@ export default function Servers() {
     return (<>
       <div className="card" style={{padding:16}}>
         <div style={{display:'flex',justifyContent:'space-around',flexWrap:'wrap',gap:16}}>
-          <GaugeRing value={curMetrics.cpu?.value||0} color="#6c5ce7" label="CPU" unit="%"/>
+          <GaugeRing value={curMetrics.cpu?.value||0} color="#2563eb" label="CPU" unit="%"/>
           <GaugeRing value={curMetrics.ram?.value||0} color="#00d4ff" label="RAM" unit="%"/>
           <GaugeRing value={curMetrics.disk?.value||0} color="#facc15" label="Диск" unit="%"/>
           <GaugeRing value={curMetrics.swap?.value||0} color="#f97316" label="Swap" unit="%"/>
@@ -649,17 +678,17 @@ export default function Servers() {
               </Link>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:10}}>
-              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+              <div style={{background:'#090d16',borderRadius:6,padding:10,border:'1px solid #1e293b'}}>
                 <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Физический гипервизор</div>
                 <div style={{fontSize:13,fontWeight:600,color:'#fff'}}>{matchedVm.source_name || 'VM-SSV'}</div>
                 <div style={{fontSize:11,color:'#818cf8',marginTop:2}}>ESXi 6.7.0 (192.168.18.222)</div>
               </div>
-              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+              <div style={{background:'#090d16',borderRadius:6,padding:10,border:'1px solid #1e293b'}}>
                 <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Виртуальная машина (Guest)</div>
                 <div style={{fontSize:13,fontWeight:600,color:'#fff'}}>{matchedVm.name}</div>
                 <div style={{fontSize:11,color:'#9aa4b2',marginTop:2}}>{matchedVm.os || 'Ubuntu Linux (64-bit)'}</div>
               </div>
-              <div style={{background:'#07111e',borderRadius:6,padding:10,border:'1px solid #1a2940'}}>
+              <div style={{background:'#090d16',borderRadius:6,padding:10,border:'1px solid #1e293b'}}>
                 <div style={{fontSize:10,color:'#9aa4b2',marginBottom:2}}>Выделенные ресурсы ESXi</div>
                 <div style={{fontSize:13,fontWeight:600,color:'#38bdf8'}}>
                   {matchedVm.cpu_count || '—'} vCPU · {matchedVm.ram_mb ? `${Math.round(matchedVm.ram_mb / 1024)} GB` : '—'} RAM
@@ -680,7 +709,7 @@ export default function Servers() {
               const pct = serverUptime[key]
               const color = pct==null?'#9aa4b2':pct>=99.9?'#4ade80':pct>=99.0?'#facc15':'#ef4444'
               return (
-                <div key={key} style={{textAlign:'center',padding:'10px 6px',background:'#07111e',borderRadius:6}}>
+                <div key={key} style={{textAlign:'center',padding:'10px 6px',background:'#090d16',borderRadius:6}}>
                   <div style={{fontSize:16,fontWeight:700,color}}>{pct!=null?pct.toFixed(2)+'%':'—'}</div>
                   <div style={{fontSize:10,color:'#9aa4b2',marginTop:3}}>{label}</div>
                 </div>
@@ -705,7 +734,7 @@ export default function Servers() {
         ))}
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-        <BigChart data={chartSeries} dataKey="cpu" color="#6c5ce7" title="CPU %" unit="%" height={180}/>
+        <BigChart data={chartSeries} dataKey="cpu" color="#2563eb" title="CPU %" unit="%" height={180}/>
         <BigChart data={chartSeries} dataKey="ram" color="#00d4ff" title="RAM %" unit="%" height={180}/>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
@@ -746,7 +775,7 @@ export default function Servers() {
             {perCore.map((v,i)=>(
               <div key={i} style={{textAlign:'center'}}>
                 <div style={{height:50,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-                  <div style={{width:24,height:`${Math.max(v,2)}%`,background:v>80?'#ef4444':v>60?'#facc15':'#6c5ce7',borderRadius:'3px 3px 0 0',transition:'height 0.4s'}}/>
+                  <div style={{width:24,height:`${Math.max(v,2)}%`,background:v>80?'#ef4444':v>60?'#facc15':'#2563eb',borderRadius:'3px 3px 0 0',transition:'height 0.4s'}}/>
                 </div>
                 <div style={{fontSize:9,color:'#fff',marginTop:2}}>{v}%</div>
                 <div style={{fontSize:8,color:'#9aa4b2'}}>#{i}</div>
@@ -755,7 +784,7 @@ export default function Servers() {
           </div>
         </div>
       )}
-      <BigChart data={chartSeries} dataKey="cpu" color="#6c5ce7" title="CPU % (история)" unit="%" height={200}/>
+      <BigChart data={chartSeries} dataKey="cpu" color="#2563eb" title="CPU % (история)" unit="%" height={200}/>
       <DualLineChart data={chartSeries} key1="load1" key2="load15" color1="#a78bfa" color2="#6366f1" label1="Load 1m" label2="Load 15m" title="Load Average" unit="" height={180}/>
     </>)
   }
@@ -881,7 +910,7 @@ export default function Servers() {
     return (<>
       <div className="card" style={{padding:16}}>
         <div style={{display:'flex',gap:24}}>
-          <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#6c5ce7'}}>{pd.total||curMetrics.processes?.value||'—'}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Всего</div></div>
+          <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#2563eb'}}>{pd.total||curMetrics.processes?.value||'—'}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Всего</div></div>
           <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:pd.zombie>0?'#ef4444':'#4ade80'}}>{pd.zombie||0}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Zombie</div></div>
         </div>
       </div>
@@ -928,9 +957,9 @@ export default function Servers() {
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <h4 style={{margin:0,fontSize:14,color:'#fff'}}>Сервисы</h4>
           <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            <input value={svcSearch} onChange={e=>setSvcSearch(e.target.value)} placeholder="🔍 Поиск сервиса..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:11,width:160,outline:'none'}}/>
+            <input value={svcSearch} onChange={e=>setSvcSearch(e.target.value)} placeholder="Поиск сервиса..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:11,width:160,outline:'none'}}/>
             {[{id:'all',l:'Все'},{id:'active',l:'Активные'},{id:'stopped',l:'Остановл.'}].map(f=>(
-              <button key={f.id} onClick={()=>setSvcFilter(f.id)} style={{padding:'4px 8px',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:svcFilter===f.id?'#6c5ce730':'#0d1b2e',color:svcFilter===f.id?'#6c5ce7':'#9aa4b2'}}>{f.l}</button>
+              <button key={f.id} onClick={()=>setSvcFilter(f.id)} style={{padding:'4px 8px',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:svcFilter===f.id?'rgba(37, 99, 235, 0.15)':'#101726',color:svcFilter===f.id?'#2563eb':'#9aa4b2'}}>{f.l}</button>
             ))}
           </div>
         </div>
@@ -941,7 +970,7 @@ export default function Servers() {
         ) : (
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
             {filteredSvc.map((s,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'#07111e',borderRadius:6,borderLeft:`3px solid ${s.status==='active'?'#4ade80':s.status==='failed'?'#ef4444':'#ef444480'}`}}>
+              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'#090d16',borderRadius:6,borderLeft:`3px solid ${s.status==='active'?'#4ade80':s.status==='failed'?'#ef4444':'#ef444480'}`}}>
                 <span style={{flex:1,fontSize:13,color:'#fff'}}>{s.name}</span>
                 <StatusBadge status={s.status}/>
               </div>
@@ -993,7 +1022,7 @@ export default function Servers() {
       <div className="card" style={{padding:16}}>
         <h4 style={{margin:'0 0 12px',fontSize:14,color:'#fff'}}>Безопасность</h4>
         <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:16}}>
-          <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#6c5ce7'}}>{ports.length}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Открытых портов</div></div>
+          <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#2563eb'}}>{ports.length}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Открытых портов</div></div>
           <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#facc15'}}>{sec.active_users||0}</div><div style={{fontSize:11,color:'#9aa4b2'}}>Пользователей</div></div>
           <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#00d4ff'}}>{sec.active_ssh_sessions||0}</div><div style={{fontSize:11,color:'#9aa4b2'}}>SSH-сессий</div></div>
           <div style={{textAlign:'center'}}><div style={{fontSize:28,fontWeight:700,color:'#38bdf8'}}>{sec.active_vpn_sessions||0}</div><div style={{fontSize:11,color:'#9aa4b2'}}>VPN-сессий</div></div>
@@ -1004,10 +1033,10 @@ export default function Servers() {
         <div className="card" style={{padding:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <h4 style={{margin:0,fontSize:14,color:'#fff'}}>Порты (LISTEN)</h4>
-            <input value={portSearch} onChange={e=>setPortSearch(e.target.value)} placeholder="🔍 Номер порта..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:11,width:140,outline:'none'}}/>
+            <input value={portSearch} onChange={e=>setPortSearch(e.target.value)} placeholder="🔍 Номер порта..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:11,width:140,outline:'none'}}/>
           </div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-            {filteredPorts.map(p=><span key={p} style={{padding:'4px 10px',background:'#1a2940',borderRadius:4,fontSize:12,color:[22,3389].includes(p)?'#facc15':[80,443,8080].includes(p)?'#4ade80':'#fff'}}>{p}</span>)}
+            {filteredPorts.map(p=><span key={p} style={{padding:'4px 10px',background:'#1e293b',borderRadius:4,fontSize:12,color:[22,3389].includes(p)?'#facc15':[80,443,8080].includes(p)?'#4ade80':'#fff'}}>{p}</span>)}
             {filteredPorts.length===0 && <span style={{color:'#9aa4b2',fontSize:12}}>Порт не найден</span>}
           </div>
           {portSearch && <div style={{fontSize:10,color:'#9aa4b2',marginTop:6}}>Найдено: {filteredPorts.length} из {ports.length}</div>}
@@ -1024,11 +1053,11 @@ export default function Servers() {
       <div className="card" style={{padding:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
           <div style={{display:'flex',gap:8}}>
-            {[{k:'system',l:'System',c:'#6c5ce7'},{k:'auth',l:'Auth/Security',c:'#ef4444'},{k:'error',l:'Error/Kernel',c:'#facc15'}].map(t=>(
-              <button key={t.k} onClick={()=>setLogTab(t.k)} style={{padding:'6px 14px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,background:logTab===t.k?t.c+'30':'#1a2940',color:logTab===t.k?t.c:'#9aa4b2'}}>{t.l}</button>
+            {[{k:'system',l:'System',c:'#2563eb'},{k:'auth',l:'Auth/Security',c:'#ef4444'},{k:'error',l:'Error/Kernel',c:'#facc15'}].map(t=>(
+              <button key={t.k} onClick={()=>setLogTab(t.k)} style={{padding:'6px 14px',borderRadius:6,border:'none',cursor:'pointer',fontSize:12,fontWeight:600,background:logTab===t.k?t.c+'30':'#1e293b',color:logTab===t.k?t.c:'#9aa4b2'}}>{t.l}</button>
             ))}
           </div>
-          <input value={logSearch} onChange={e=>setLogSearch(e.target.value)} placeholder="🔍 Поиск в логах..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:11,width:200,outline:'none'}}/>
+          <input value={logSearch} onChange={e=>setLogSearch(e.target.value)} placeholder="Поиск в логах..." style={{padding:'4px 8px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:11,width:200,outline:'none'}}/>
         </div>
         {entries.length===0 ? (
           <div style={{padding:30,textAlign:'center',color:'#9aa4b2',fontSize:12}}>Нет логов. Агент ещё не прислал данные или нет прав на чтение журнала.</div>
@@ -1037,7 +1066,7 @@ export default function Servers() {
         ) : (
           <div style={{maxHeight:400,overflowY:'auto',fontFamily:'monospace',fontSize:11,lineHeight:1.6}}>
             {filteredEntries.map((line,i)=>(
-              <div key={i} style={{padding:'2px 0',color:line.toLowerCase().includes('error')||line.toLowerCase().includes('fail')?'#ef4444':line.toLowerCase().includes('warn')?'#facc15':'#c8d1dc',borderBottom:'1px solid #1a294020'}}>{line}</div>
+              <div key={i} style={{padding:'2px 0',color:line.toLowerCase().includes('error')||line.toLowerCase().includes('fail')?'#ef4444':line.toLowerCase().includes('warn')?'#facc15':'#c8d1dc',borderBottom:'1px solid #1e293b'}}>{line}</div>
             ))}
           </div>
         )}
@@ -1072,7 +1101,7 @@ export default function Servers() {
           <h4 style={{margin:'0 0 12px',fontSize:14,color:'#fff'}}>Температура</h4>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:8}}>
             {temps.map((t,i)=>(
-              <div key={i} style={{padding:10,background:'#07111e',borderRadius:6}}>
+              <div key={i} style={{padding:10,background:'#090d16',borderRadius:6}}>
                 <div style={{fontSize:11,color:'#9aa4b2'}}>{t.label}</div>
                 <div style={{fontSize:20,fontWeight:700,color:t.current>(t.high||80)?'#ef4444':t.current>(t.high||80)*0.8?'#facc15':'#4ade80'}}>{t.current}°C</div>
                 {t.high && <div style={{fontSize:10,color:'#9aa4b2'}}>Макс: {t.high}°C</div>}
@@ -1166,12 +1195,12 @@ export default function Servers() {
             <div className="card" style={{width:260,minWidth:260,padding:12,alignSelf:'flex-start',position:'sticky',top:16}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                 <h4 style={{margin:0,fontSize:14}}>Серверы</h4>
-                <button onClick={()=>{setShowModal(true);setModalTab('agent')}} style={{background:'#6c5ce7',color:'#fff',border:'none',borderRadius:4,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:600}}>+ Добавить</button>
+                <button onClick={()=>{setShowModal(true);setModalTab('agent')}} style={{background:'#2563eb',color:'#fff',border:'none',borderRadius:4,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:600}}>+ Добавить</button>
               </div>
-              <input value={serverSearch} onChange={e=>setServerSearch(e.target.value)} placeholder="🔍 Поиск..." style={{width:'100%',padding:'5px 8px',borderRadius:4,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:11,marginBottom:6,outline:'none',boxSizing:'border-box'}}/>
+              <input value={serverSearch} onChange={e=>setServerSearch(e.target.value)} placeholder="Поиск..." style={{width:'100%',padding:'5px 8px',borderRadius:4,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:11,marginBottom:6,outline:'none',boxSizing:'border-box'}}/>
               <div style={{display:'flex',gap:3,marginBottom:8}}>
                 {[{id:'all',l:'Все'},{id:'ok',l:'Online'},{id:'down',l:'Offline'}].map(f=>(
-                  <button key={f.id} onClick={()=>setServerStatusFilter(f.id)} style={{flex:1,padding:'3px 0',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:serverStatusFilter===f.id?'#6c5ce730':'#0d1b2e',color:serverStatusFilter===f.id?'#6c5ce7':'#9aa4b2'}}>{f.l}</button>
+                  <button key={f.id} onClick={()=>setServerStatusFilter(f.id)} style={{flex:1,padding:'3px 0',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:serverStatusFilter===f.id?'rgba(37, 99, 235, 0.15)':'#101726',color:serverStatusFilter===f.id?'#2563eb':'#9aa4b2'}}>{f.l}</button>
                 ))}
               </div>
               {loading && <div style={{color:'#9aa4b2',fontSize:12,padding:12}}>Загрузка...</div>}
@@ -1188,7 +1217,7 @@ export default function Servers() {
                   const isSel = selected?.id===s.id
                   const sM = s.last_metrics||{}
                   return (
-                    <div key={s.id} onClick={()=>{setSelected(s);setActiveTab('overview');loadMetrics(s.id);loadServerUptime(s.id);setServerUptime(null)}} style={{display:'flex',alignItems:'center',gap:4,padding:'8px 10px',borderRadius:6,cursor:'pointer',background:isSel?'#6c5ce720':'transparent',border:isSel?'1px solid #6c5ce740':'1px solid transparent',transition:'all 0.15s'}}>
+                    <div key={s.id} onClick={()=>{setSelected(s);setActiveTab('overview');loadMetrics(s.id);loadServerUptime(s.id);setServerUptime(null)}} style={{display:'flex',alignItems:'center',gap:4,padding:'8px 10px',borderRadius:6,cursor:'pointer',background:isSel?'#2563eb20':'transparent',border:isSel?'1px solid #2563eb40':'1px solid transparent',transition:'all 0.15s'}}>
                       <div style={{flex:1,minWidth:0}}>
                         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:2}}>
                           <span style={{fontSize:13,color:'#fff',fontWeight:isSel?600:400,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.name}</span>
@@ -1199,7 +1228,7 @@ export default function Servers() {
                             <StatusBadge status={s.status}/>
                           </div>
                         </div>
-                        <div style={{fontSize:10,color:'#9aa4b2'}}>{s.host||'no host'} <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:s.monitor_type==='ssh'?'#00b89422':s.monitor_type==='winrm'?'#0984e322':s.monitor_type==='ping_only'?'#f39c1222':'#6c5ce722',color:s.monitor_type==='ssh'?'#00b894':s.monitor_type==='winrm'?'#0984e3':s.monitor_type==='ping_only'?'#f39c12':'#a29bfe',marginLeft:4}}>{s.monitor_type==='ssh'?'SSH':s.monitor_type==='winrm'?'WinRM':s.monitor_type==='ping_only'?'Ping':s.monitor_type==='agent'?'Agent':'Agent'}</span></div>
+                        <div style={{fontSize:10,color:'#9aa4b2'}}>{s.host||'no host'} <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:s.monitor_type==='ssh'?'#00b89422':s.monitor_type==='winrm'?'#0984e322':s.monitor_type==='ping_only'?'#f39c1222':'#2563eb22',color:s.monitor_type==='ssh'?'#00b894':s.monitor_type==='winrm'?'#0984e3':s.monitor_type==='ping_only'?'#f39c12':'#a29bfe',marginLeft:4}}>{s.monitor_type==='ssh'?'SSH':s.monitor_type==='winrm'?'WinRM':s.monitor_type==='ping_only'?'Ping':s.monitor_type==='agent'?'Agent':'Agent'}</span></div>
                         {(() => {
                           const sVm = findMatchedVm(s, vms)
                           if (!sVm) return null
@@ -1286,7 +1315,7 @@ export default function Servers() {
                         style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#0284c720',color:'#38bdf8',border:'1px solid #0284c740',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600,opacity:upgradingAgentId === selServer.id ? 0.6 : 1}}>
                         {upgradingAgentId === selServer.id ? '⏳ Обновление...' : '🔄 Обновить агент'}
                       </button>
-                      <button onClick={() => { loadServerAgentKeys(selServer.id); setShowAgentKeysModal(true) }} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#6c5ce720',color:'#a78bfa',border:'1px solid #6c5ce740',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600}}>
+                      <button onClick={() => { loadServerAgentKeys(selServer.id); setShowAgentKeysModal(true) }} style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'#2563eb20',color:'#a78bfa',border:'1px solid #2563eb40',borderRadius:6,cursor:'pointer',fontSize:11,fontWeight:600}}>
                         🔑 Ключи агента
                       </button>
                     </>)}
@@ -1294,13 +1323,36 @@ export default function Servers() {
                   </div>
                 </div>
                 <div style={{display:'flex',gap:4,overflowX:'auto',paddingBottom:4,marginTop:12}}>
-                  {TABS.map(tab=>(
-                    <button key={tab.id} onClick={()=>setActiveTab(tab.id)} style={{padding:'8px 12px',borderRadius:6,border:'none',cursor:'pointer',fontSize:11,fontWeight:600,whiteSpace:'nowrap',transition:'all 0.15s',background:activeTab===tab.id?'#6c5ce730':'#0d1b2e',color:activeTab===tab.id?'#6c5ce7':'#9aa4b2',borderBottom:activeTab===tab.id?'2px solid #6c5ce7':'2px solid transparent'}}>
-                      <span style={{marginRight:3}}>{tab.icon}</span>{tab.label}
-                    </button>
-                  ))}
+                  {TABS.map(tab => {
+                    const TabIcon = tab.icon
+                    const isActive = activeTab === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        style={{
+                          padding: '6px 11px',
+                          borderRadius: 4,
+                          border: `1px solid ${isActive ? '#2563eb' : '#1e293b'}`,
+                          cursor: 'pointer',
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s',
+                          background: isActive ? '#2563eb' : '#101726',
+                          color: isActive ? '#ffffff' : '#94a3b8',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <TabIcon size={13} />
+                        <span>{tab.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-                <TimeRangeFilter onChange={handleTimeRangeChange} accent="#6c5ce7"/>
+                <TimeRangeFilter onChange={handleTimeRangeChange} accent="#2563eb"/>
                 {tabRenderers[activeTab]?.()}
               </>)}
             </div>
@@ -1310,28 +1362,28 @@ export default function Servers() {
       {/* ── Agent keys modal ─────────────────────────────────────────────── */}
       {showAgentKeysModal && (
         <div onClick={() => setShowAgentKeysModal(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#0d1b2e',borderRadius:12,width:'100%',maxWidth:560,maxHeight:'85vh',overflow:'auto',border:'1px solid #1a2940',display:'flex',flexDirection:'column'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid #1a2940',flexShrink:0}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#101726',borderRadius:12,width:'100%',maxWidth:560,maxHeight:'85vh',overflow:'auto',border:'1px solid #1e293b',display:'flex',flexDirection:'column'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',borderBottom:'1px solid #1e293b',flexShrink:0}}>
               <span style={{fontSize:15,fontWeight:700,color:'#fff'}}>🔑 Ключи агента — {selServer?.name}</span>
               <button onClick={() => setShowAgentKeysModal(false)} style={{background:'none',border:'none',color:'#9aa4b2',fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
             </div>
             <div style={{padding:20,display:'flex',flexDirection:'column',gap:14}}>
               <div style={{display:'flex',gap:8}}>
-                <button onClick={handleCreateAgentKey} disabled={selectedKeyLoading} style={{background:'#6c5ce7',color:'#fff',border:'none',borderRadius:6,padding:'8px 14px',cursor:'pointer',fontSize:12,fontWeight:600,opacity:selectedKeyLoading?0.7:1}}>
+                <button onClick={handleCreateAgentKey} disabled={selectedKeyLoading} style={{background:'#2563eb',color:'#fff',border:'none',borderRadius:6,padding:'8px 14px',cursor:'pointer',fontSize:12,fontWeight:600,opacity:selectedKeyLoading?0.7:1}}>
                   {selectedKeyLoading ? 'Генерация...' : '+ Сгенерировать ключ'}
                 </button>
-                <button onClick={() => loadServerAgentKeys(selServer.id)} style={{background:'#0d1726',color:'#9aa4b2',border:'1px solid #1a2940',borderRadius:6,padding:'8px 14px',cursor:'pointer',fontSize:12}}>
+                <button onClick={() => loadServerAgentKeys(selServer.id)} style={{background:'#0d1726',color:'#9aa4b2',border:'1px solid #1e293b',borderRadius:6,padding:'8px 14px',cursor:'pointer',fontSize:12}}>
                   ↻ Обновить
                 </button>
               </div>
               {selectedAgentKey && (
-                <div style={{background:'#0a1929',border:'1px solid #6c5ce740',borderRadius:8,padding:12}}>
+                <div style={{background:'#101726',border:'1px solid #2563eb40',borderRadius:8,padding:12}}>
                   <div style={{fontSize:11,color:'#a78bfa',marginBottom:6,fontWeight:600}}>Новый ключ (сохраните — показывается один раз)</div>
                   <div style={{fontFamily:'monospace',fontSize:12,color:'#e2e8f0',wordBreak:'break-all',marginBottom:8}}>{selectedAgentKey}</div>
-                  <button onClick={() => { navigator.clipboard.writeText(selectedAgentKey); setAgentCopied(true); setTimeout(() => setAgentCopied(false), 2000) }} style={{padding:'4px 10px',borderRadius:5,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:11}}>{agentCopied ? '✓ Скопировано' : 'Копировать'}</button>
+                  <button onClick={() => { navigator.clipboard.writeText(selectedAgentKey); setAgentCopied(true); setTimeout(() => setAgentCopied(false), 2000) }} style={{padding:'4px 10px',borderRadius:5,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:11}}>{agentCopied ? '✓ Скопировано' : 'Копировать'}</button>
                 </div>
               )}
-              <div style={{background:'#07111e',border:'1px solid #1a2940',borderRadius:8,padding:12}}>
+              <div style={{background:'#090d16',border:'1px solid #1e293b',borderRadius:8,padding:12}}>
                 <div style={{fontSize:11,color:'#9aa4b2',marginBottom:10,fontWeight:600}}>Ключи сервера</div>
                 {selectedAgentKeys.length > 0 ? selectedAgentKeys.map(key => (
                   <div key={key.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 10px',borderRadius:6,background:'#0d1726',marginBottom:6}}>
@@ -1354,10 +1406,10 @@ export default function Servers() {
                 )}
               </div>
               {(selectedAgentKeys.length > 0 || selectedAgentKey) && (
-                <div style={{background:'#07111e',border:'1px solid #1a2940',borderRadius:8,padding:12}}>
+                <div style={{background:'#090d16',border:'1px solid #1e293b',borderRadius:8,padding:12}}>
                   <div style={{fontSize:11,color:'#9aa4b2',marginBottom:8,fontWeight:600}}>Команда установки</div>
-                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1a2940',borderRadius:6,padding:10,color:'#c8d1dc'}}>{buildServerInstallCommand()}</pre>
-                  <button onClick={() => { navigator.clipboard.writeText(buildServerInstallCommand()); setAgentCopied(true); setTimeout(() => setAgentCopied(false), 2000) }} style={{marginTop:8,padding:'5px 12px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>{agentCopied ? '✓ Скопировано' : 'Копировать команду'}</button>
+                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1e293b',borderRadius:6,padding:10,color:'#c8d1dc'}}>{buildServerInstallCommand()}</pre>
+                  <button onClick={() => { navigator.clipboard.writeText(buildServerInstallCommand()); setAgentCopied(true); setTimeout(() => setAgentCopied(false), 2000) }} style={{marginTop:8,padding:'5px 12px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>{agentCopied ? '✓ Скопировано' : 'Копировать команду'}</button>
                 </div>
               )}
             </div>
@@ -1367,10 +1419,10 @@ export default function Servers() {
       {/* ── Agent / Server install modal ─────────────────────────────────── */}
       {showModal && (
         <div onClick={closeModal} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <div onClick={e=>e.stopPropagation()} style={{background:'#0d1b2e',borderRadius:12,width:'100%',maxWidth:660,maxHeight:'92vh',overflow:'auto',border:'1px solid #1a2940',display:'flex',flexDirection:'column'}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'#101726',borderRadius:12,width:'100%',maxWidth:660,maxHeight:'92vh',overflow:'auto',border:'1px solid #1e293b',display:'flex',flexDirection:'column'}}>
 
             {/* Header */}
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 24px',borderBottom:'1px solid #1a2940',flexShrink:0}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'18px 24px',borderBottom:'1px solid #1e293b',flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span style={{fontSize:20}}>⬡</span>
                 <span style={{fontSize:16,fontWeight:700,color:'#fff'}}>Добавить агент / сервер</span>
@@ -1379,9 +1431,9 @@ export default function Servers() {
             </div>
 
             {/* Tab bar */}
-            <div style={{display:'flex',borderBottom:'1px solid #1a2940',flexShrink:0}}>
+            <div style={{display:'flex',borderBottom:'1px solid #1e293b',flexShrink:0}}>
               {[{id:'agent',label:'🤖  Установить агент'},{id:'update',label:'🔄  Обновить агент'},{id:'server',label:'🖥️  Подключить сервер'}].map(t=>(
-                <button key={t.id} onClick={()=>setModalTab(t.id)} style={{padding:'12px 22px',border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:'transparent',color:modalTab===t.id?'#a78bfa':'#9aa4b2',borderBottom:modalTab===t.id?'2px solid #6c5ce7':'2px solid transparent',transition:'all 0.15s'}}>
+                <button key={t.id} onClick={()=>setModalTab(t.id)} style={{padding:'12px 22px',border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:'transparent',color:modalTab===t.id?'#a78bfa':'#9aa4b2',borderBottom:modalTab===t.id?'2px solid #2563eb':'2px solid transparent',transition:'all 0.15s'}}>
                   {t.label}
                 </button>
               ))}
@@ -1400,7 +1452,7 @@ export default function Servers() {
                       {id:'linux',    icon:'🐧', label:'Linux x64'},
                       {id:'linux-arm64', icon:'🐧', label:'Linux arm64'},
                     ].map(p=>(
-                      <button key={p.id} onClick={()=>setAgentPlatform(p.id)} style={{flex:1,padding:'10px 8px',borderRadius:8,border:agentPlatform===p.id?'2px solid #6c5ce7':'2px solid #1a2940',background:agentPlatform===p.id?'#6c5ce720':'#07111e',color:agentPlatform===p.id?'#a78bfa':'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',flexDirection:'column',alignItems:'center',gap:4,transition:'all 0.15s'}}>
+                      <button key={p.id} onClick={()=>setAgentPlatform(p.id)} style={{flex:1,padding:'10px 8px',borderRadius:8,border:agentPlatform===p.id?'2px solid #2563eb':'2px solid #1e293b',background:agentPlatform===p.id?'#2563eb20':'#090d16',color:agentPlatform===p.id?'#a78bfa':'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600,display:'flex',flexDirection:'column',alignItems:'center',gap:4,transition:'all 0.15s'}}>
                         <span style={{fontSize:22}}>{p.icon}</span>{p.label}
                       </button>
                     ))}
@@ -1411,20 +1463,20 @@ export default function Servers() {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Server ID <span style={{color:'#ef4444'}}>*</span></div>
-                    <input value={agentForm.serverId} onChange={e=>setAgentForm({...agentForm,serverId:e.target.value.replace(/[^a-zA-Z0-9_\-.]/g,'-')})} placeholder="my-server-01" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input value={agentForm.serverId} onChange={e=>setAgentForm({...agentForm,serverId:e.target.value.replace(/[^a-zA-Z0-9_\-.]/g,'-')})} placeholder="my-server-01" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                     <div style={{fontSize:10,color:'#9aa4b2',marginTop:3}}>Латиница, цифры, «-» «_» «.»</div>
                   </div>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Отображаемое имя <span style={{color:'#ef4444'}}>*</span></div>
-                    <input value={agentForm.name} onChange={e=>setAgentForm({...agentForm,name:e.target.value})} placeholder="Production Server" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input value={agentForm.name} onChange={e=>setAgentForm({...agentForm,name:e.target.value})} placeholder="Production Server" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                   </div>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Host / IP <span style={{color:'#9aa4b2',fontWeight:400}}>(опционально)</span></div>
-                    <input value={agentForm.host} onChange={e=>setAgentForm({...agentForm,host:e.target.value})} placeholder="192.168.1.100" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input value={agentForm.host} onChange={e=>setAgentForm({...agentForm,host:e.target.value})} placeholder="192.168.1.100" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                   </div>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Интервал сбора (сек)</div>
-                    <input value={agentForm.interval} onChange={e=>setAgentForm({...agentForm,interval:e.target.value.replace(/\D/g,'')})} placeholder="15" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input value={agentForm.interval} onChange={e=>setAgentForm({...agentForm,interval:e.target.value.replace(/\D/g,'')})} placeholder="15" style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                   </div>
                   <div style={{gridColumn:'1 / -1',display:'flex',alignItems:'center',gap:8,fontSize:12,color:'#9aa4b2'}}>
                     <input type="checkbox" checked={generateAgentToken} onChange={e=>setGenerateAgentToken(e.target.checked)} style={{width:16,height:16}}/>
@@ -1439,21 +1491,21 @@ export default function Servers() {
                       {agentPlatform==='windows' ? '💻 PowerShell (от имени Администратора)' : '💻 Bash'}
                     </div>
                     <button onClick={()=>{navigator.clipboard.writeText(buildInstallCommand());setAgentCopied(true);setTimeout(()=>setAgentCopied(false),2000)}}
-                      style={{padding:'5px 12px',borderRadius:5,border:'none',background:agentCopied?'#4ade8030':'#1a2940',color:agentCopied?'#4ade80':'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600,transition:'all 0.2s'}}>
+                      style={{padding:'5px 12px',borderRadius:5,border:'none',background:agentCopied?'#4ade8030':'#1e293b',color:agentCopied?'#4ade80':'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600,transition:'all 0.2s'}}>
                       {agentCopied ? '✓ Скопировано' : '📋 Копировать'}
                     </button>
                   </div>
-                  <pre style={{background:'#020d1a',border:'1px solid #1a2940',borderRadius:8,padding:14,fontSize:11,color:'#c8d1dc',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-all',margin:0,lineHeight:1.7,fontFamily:'Consolas,monospace'}}>
+                  <pre style={{background:'#020d1a',border:'1px solid #1e293b',borderRadius:8,padding:14,fontSize:11,color:'#c8d1dc',overflowX:'auto',whiteSpace:'pre-wrap',wordBreak:'break-all',margin:0,lineHeight:1.7,fontFamily:'Consolas,monospace'}}>
                     {buildInstallCommand()}
                   </pre>
                 </div>
 
                 {agentToken && (
-                  <div style={{padding:14,border:'1px solid #1a2940',borderRadius:10,background:'#09111c',display:'flex',flexDirection:'column',gap:10}}>
+                  <div style={{padding:14,border:'1px solid #1e293b',borderRadius:10,background:'#09111c',display:'flex',flexDirection:'column',gap:10}}>
                     <div style={{fontSize:11,color:'#9aa4b2'}}>Серверный токен агента создан. Используйте его при установке:</div>
                     <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-                      <code style={{padding:'8px 10px',borderRadius:8,background:'#020d1a',border:'1px solid #1a2940',color:'#a78bfa',fontSize:12,overflowWrap:'anywhere'}}>{agentToken}</code>
-                      <button onClick={()=>{navigator.clipboard.writeText(agentToken);setAgentCopied(true);setTimeout(()=>setAgentCopied(false),2000)}} style={{padding:'6px 12px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>{agentCopied ? '✓ Скопировано' : 'Копировать токен'}</button>
+                      <code style={{padding:'8px 10px',borderRadius:8,background:'#020d1a',border:'1px solid #1e293b',color:'#a78bfa',fontSize:12,overflowWrap:'anywhere'}}>{agentToken}</code>
+                      <button onClick={()=>{navigator.clipboard.writeText(agentToken);setAgentCopied(true);setTimeout(()=>setAgentCopied(false),2000)}} style={{padding:'6px 12px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}>{agentCopied ? '✓ Скопировано' : 'Копировать токен'}</button>
                     </div>
                   </div>
                 )}
@@ -1466,7 +1518,7 @@ export default function Servers() {
                       {/* GUI installer — primary */}
                       {(agentInfo.available_files||[]).includes('MonitoringAgentInstaller.exe') && (
                         <button onClick={()=>downloadAgentFile('MonitoringAgentInstaller.exe')}
-                          style={{padding:'12px 18px',borderRadius:8,border:'2px solid #6c5ce7',background:'#6c5ce720',color:'#a78bfa',cursor:'pointer',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:10,width:'100%'}}>
+                          style={{padding:'12px 18px',borderRadius:8,border:'2px solid #2563eb',background:'#2563eb20',color:'#a78bfa',cursor:'pointer',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:10,width:'100%'}}>
                           <span style={{fontSize:22}}>🪟</span>
                           <div style={{textAlign:'left'}}>
                             <div>MonitoringAgentInstaller.exe</div>
@@ -1477,12 +1529,12 @@ export default function Servers() {
                       {/* Script fallback */}
                       <div style={{display:'flex',gap:8}}>
                         <button onClick={()=>downloadAgentFile('install.ps1')}
-                          style={{padding:'7px 12px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600}}>
+                          style={{padding:'7px 12px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600}}>
                           ⬇ install.ps1
                         </button>
                         {(agentInfo.available_files||[]).includes('MonitoringAgent.exe') && (
                           <button onClick={()=>downloadAgentFile('MonitoringAgent.exe')}
-                            style={{padding:'7px 12px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600}}>
+                            style={{padding:'7px 12px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#9aa4b2',cursor:'pointer',fontSize:11,fontWeight:600}}>
                             ⬇ MonitoringAgent.exe
                           </button>
                         )}
@@ -1496,7 +1548,7 @@ export default function Servers() {
                       </button>
                       {(agentInfo.available_files||[]).includes(`monitoring-agent-linux-${agentPlatform==='linux-arm64'?'arm64':'amd64'}`) && (
                         <button onClick={()=>downloadAgentFile(`monitoring-agent-linux-${agentPlatform==='linux-arm64'?'arm64':'amd64'}`)}
-                          style={{padding:'8px 14px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                          style={{padding:'8px 14px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
                           ⬇ monitoring-agent-linux-{agentPlatform==='linux-arm64'?'arm64':'amd64'}
                         </button>
                       )}
@@ -1506,7 +1558,7 @@ export default function Servers() {
                 </div>
 
                 {/* Register button */}
-                <div style={{borderTop:'1px solid #1a2940',paddingTop:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{borderTop:'1px solid #1e293b',paddingTop:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <div style={{fontSize:11,color:'#9aa4b2'}}>
                     {agentRegDone
                       ? <span style={{color:'#4ade80'}}>✓ Сервер зарегистрирован в системе</span>
@@ -1515,11 +1567,11 @@ export default function Servers() {
                   <div style={{display:'flex',gap:8}}>
                     {!agentRegDone && (
                       <button onClick={handleRegisterAgent} disabled={agentRegLoading||!agentForm.serverId.trim()||!agentForm.name.trim()}
-                        style={{padding:'8px 16px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:(agentRegLoading||!agentForm.serverId.trim()||!agentForm.name.trim())?0.5:1}}>
+                        style={{padding:'8px 16px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:(agentRegLoading||!agentForm.serverId.trim()||!agentForm.name.trim())?0.5:1}}>
                         {agentRegLoading ? '...' : '+ Зарегистрировать'}
                       </button>
                     )}
-                    <button onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1a2940',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                    <button onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1e293b',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
                       Закрыть
                     </button>
                   </div>
@@ -1540,7 +1592,7 @@ export default function Servers() {
                 {/* Вариант 1: Команда на сервере */}
                 <div>
                   <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:6}}>1. Обновление на Linux сервере (одной командой):</div>
-                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1a2940',borderRadius:6,padding:10,color:'#4ade80'}}>
+                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1e293b',borderRadius:6,padding:10,color:'#4ade80'}}>
                     {`curl -sSf http://${typeof window !== 'undefined' ? window.location.hostname : '192.168.17.50'}:9000/agent/update.sh | sudo bash`}
                   </pre>
                   <button onClick={()=>{
@@ -1555,7 +1607,7 @@ export default function Servers() {
                 {/* Вариант 2: Windows */}
                 <div>
                   <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:6}}>2. Обновление на Windows сервере (PowerShell):</div>
-                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1a2940',borderRadius:6,padding:10,color:'#38bdf8'}}>
+                  <pre style={{margin:0,whiteSpace:'pre-wrap',wordBreak:'break-all',fontSize:11,background:'#020d1a',border:'1px solid #1e293b',borderRadius:6,padding:10,color:'#38bdf8'}}>
                     {`irm http://${typeof window !== 'undefined' ? window.location.hostname : '192.168.17.50'}:9000/agent/update.ps1 | iex`}
                   </pre>
                   <button onClick={()=>{
@@ -1568,18 +1620,18 @@ export default function Servers() {
                 </div>
 
                 {/* Вариант 3: Массовое обновление */}
-                <div style={{background:'#07111e',border:'1px solid #1a2940',borderRadius:8,padding:14}}>
+                <div style={{background:'#090d16',border:'1px solid #1e293b',borderRadius:8,padding:14}}>
                   <div style={{fontSize:12,color:'#fff',fontWeight:600,marginBottom:4}}>3. Централизованное обновление всех агентов:</div>
                   <div style={{fontSize:11,color:'#9aa4b2',marginBottom:12}}>
                     Отправляет сигнал обновления на все серверы. Каждый работающий агент скачает актуальный бинарник и перезапустится в течение 15–30 секунд.
                   </div>
-                  <button onClick={handleUpgradeAllAgents} style={{padding:'8px 16px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                  <button onClick={handleUpgradeAllAgents} style={{padding:'8px 16px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>
                     🔄 Запланировать обновление для всех серверов
                   </button>
                 </div>
 
-                <div style={{display:'flex',justifyContent:'flex-end',borderTop:'1px solid #1a2940',paddingTop:14}}>
-                  <button onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1a2940',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
+                <div style={{display:'flex',justifyContent:'flex-end',borderTop:'1px solid #1e293b',paddingTop:14}}>
+                  <button onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1e293b',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>
                     Закрыть
                   </button>
                 </div>
@@ -1592,20 +1644,20 @@ export default function Servers() {
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Server ID <span style={{color:'#ef4444'}}>*</span></div>
-                    <input placeholder="my-server" value={addForm.id} onChange={e=>setAddForm({...addForm,id:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input placeholder="my-server" value={addForm.id} onChange={e=>setAddForm({...addForm,id:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                   </div>
                   <div>
                     <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Имя <span style={{color:'#ef4444'}}>*</span></div>
-                    <input placeholder="Production Server" value={addForm.name} onChange={e=>setAddForm({...addForm,name:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                    <input placeholder="Production Server" value={addForm.name} onChange={e=>setAddForm({...addForm,name:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                   </div>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Host / IP</div>
-                  <input placeholder="192.168.1.100" value={addForm.host} onChange={e=>setAddForm({...addForm,host:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
+                  <input placeholder="192.168.1.100" value={addForm.host} onChange={e=>setAddForm({...addForm,host:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none',boxSizing:'border-box'}}/>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'#9aa4b2',marginBottom:4}}>Тип мониторинга</div>
-                  <select value={addForm.monitor_type} onChange={e=>setAddForm({...addForm,monitor_type:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}>
+                  <select value={addForm.monitor_type} onChange={e=>setAddForm({...addForm,monitor_type:e.target.value})} style={{width:'100%',padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}>
                     <option value="agent">Агент (пассивный)</option>
                     <option value="ssh">SSH (Linux)</option>
                     <option value="winrm">WinRM (Windows)</option>
@@ -1614,24 +1666,24 @@ export default function Servers() {
                 </div>
                 {addForm.monitor_type === 'ssh' && (
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    <input placeholder="SSH пользователь (root)" value={addForm.ssh_user} onChange={e=>setAddForm({...addForm,ssh_user:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
-                    <input placeholder="SSH порт (22)" value={addForm.ssh_port} onChange={e=>setAddForm({...addForm,ssh_port:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
-                    <input placeholder="Пароль SSH" type="password" value={addForm.ssh_password} onChange={e=>setAddForm({...addForm,ssh_password:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
-                    <input placeholder="Путь к SSH ключу" value={addForm.ssh_key_path} onChange={e=>setAddForm({...addForm,ssh_key_path:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="SSH пользователь (root)" value={addForm.ssh_user} onChange={e=>setAddForm({...addForm,ssh_user:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="SSH порт (22)" value={addForm.ssh_port} onChange={e=>setAddForm({...addForm,ssh_port:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="Пароль SSH" type="password" value={addForm.ssh_password} onChange={e=>setAddForm({...addForm,ssh_password:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="Путь к SSH ключу" value={addForm.ssh_key_path} onChange={e=>setAddForm({...addForm,ssh_key_path:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
                   </div>
                 )}
                 {addForm.monitor_type === 'winrm' && (
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    <input placeholder="WinRM пользователь" value={addForm.winrm_user} onChange={e=>setAddForm({...addForm,winrm_user:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
-                    <input placeholder="Пароль WinRM" type="password" value={addForm.winrm_password} onChange={e=>setAddForm({...addForm,winrm_password:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
-                    <input placeholder="Порт (5985)" value={addForm.winrm_port} onChange={e=>setAddForm({...addForm,winrm_port:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1a2940',background:'#07111e',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="WinRM пользователь" value={addForm.winrm_user} onChange={e=>setAddForm({...addForm,winrm_user:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="Пароль WinRM" type="password" value={addForm.winrm_password} onChange={e=>setAddForm({...addForm,winrm_password:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
+                    <input placeholder="Порт (5985)" value={addForm.winrm_port} onChange={e=>setAddForm({...addForm,winrm_port:e.target.value})} style={{padding:'8px 10px',borderRadius:6,border:'1px solid #1e293b',background:'#090d16',color:'#fff',fontSize:12,outline:'none'}}/>
                     <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#9aa4b2',padding:'8px 0'}}><input type="checkbox" checked={addForm.winrm_use_ssl} onChange={e=>setAddForm({...addForm,winrm_use_ssl:e.target.checked})}/> HTTPS (SSL)</label>
                   </div>
                 )}
                 {addError && <div style={{color:'#ef4444',fontSize:12,padding:'6px 10px',background:'#ef444420',borderRadius:5}}>{addError}</div>}
                 <div style={{display:'flex',gap:8,justifyContent:'flex-end',paddingTop:4}}>
-                  <button type="button" onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1a2940',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>Отмена</button>
-                  <button type="submit" disabled={addLoading} style={{padding:'8px 20px',borderRadius:6,border:'none',background:'#6c5ce7',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:addLoading?0.6:1}}>{addLoading?'Добавление...':'Добавить сервер'}</button>
+                  <button type="button" onClick={closeModal} style={{padding:'8px 16px',borderRadius:6,border:'1px solid #1e293b',background:'transparent',color:'#9aa4b2',cursor:'pointer',fontSize:12,fontWeight:600}}>Отмена</button>
+                  <button type="submit" disabled={addLoading} style={{padding:'8px 20px',borderRadius:6,border:'none',background:'#2563eb',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600,opacity:addLoading?0.6:1}}>{addLoading?'Добавление...':'Добавить сервер'}</button>
                 </div>
               </form>
             )}
