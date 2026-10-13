@@ -32,7 +32,7 @@ async def delete_server(server_id: str, current_user: dict = Depends(get_current
 @router.get('/api/servers/{server_id}/metrics')
 async def server_metrics(server_id: str, limit: int = 500, from_ts: Optional[int] = None, to_ts: Optional[int] = None, current_user: dict = Depends(get_current_user)):
     """Get historical time-series metrics for server."""
-    return ServerService.get_server_metrics(server_id, limit=limit, from_ts=from_ts, to_ts=to_ts)
+    return await ServerService.get_server_metrics(server_id, limit=limit, from_ts=from_ts, to_ts=to_ts)
 
 @router.get('/api/servers/{server_id}/agent-keys', response_model=List[AgentTokenResponse])
 async def list_server_agent_keys(server_id: str, current_user: dict = Depends(get_admin_user)):

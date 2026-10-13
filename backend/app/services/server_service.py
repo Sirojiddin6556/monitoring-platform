@@ -211,11 +211,39 @@ class ServerService:
         return {'message': 'Server deleted'}
 
     @staticmethod
-    def get_server_metrics(server_id: str, limit: int = 500, from_ts: Optional[int] = None, to_ts: Optional[int] = None) -> Dict[str, Any]:
-        """Retrieve recent ring-buffer metrics for a given server."""
-        limit = max(1, min(limit, 1000))
+    async def get_server_metrics(server_id: str, limit: int = 500, from_ts: Optional[int] = None, to_ts: Optional[int] = None) -> Dict[str, Any]:
+        """Retrieve historical time-series metrics from PostgreSQL with fallback to ring-buffer."""
+        limit = max(1, min(limit, 2000))
         if from_ts is not None and to_ts is not None and from_ts > to_ts:
             raise HTTPException(status_code=400, detail='from_ts must be less than or equal to to_ts')
+
+        db_items = []
+        try:
+            from ..models import Metric as MetricModel
+            import datetime
+
+            async with db.get_session() as session:
+                stmt = select(MetricModel).where(MetricModel.server_id == server_id)
+                if from_ts is not None:
+                    stmt = stmt.where(MetricModel.received_at >= datetime.datetime.utcfromtimestamp(from_ts))
+                if to_ts is not None:
+                    stmt = stmt.where(MetricModel.received_at <= datetime.datetime.utcfromtimestamp(to_ts))
+
+                stmt = stmt.order_by(MetricModel.received_at.desc()).limit(limit)
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+
+                for r in reversed(rows):
+                    ts = r.received_at.timestamp() if r.received_at else None
+                    db_items.append({
+                        'payload': r.payload or {},
+                        'received_at': ts
+                    })
+        except Exception:
+            pass
+
+        if db_items:
+            return {'metrics': db_items}
 
         items = [m for m in METRICS_STORE if m.get('payload', {}).get('server_id') == server_id]
         if from_ts is not None:

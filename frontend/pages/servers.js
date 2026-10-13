@@ -807,6 +807,13 @@ export default function Servers() {
     }
   }, [selected])
 
+  useEffect(() => {
+    if (selected?.id) {
+      loadMetrics(selected.id, timeRange)
+      loadServerUptime(selected.id)
+    }
+  }, [selected?.id])
+
   function loadServerUptime(id) {
     Promise.resolve().then(() =>
       apiFetch('/api/sla/summary')
