@@ -36,6 +36,7 @@ export default function ExecutiveDashboard() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [serviceFilter, setServiceFilter] = useState('all')
+  const [dockerContainers, setDockerContainers] = useState([])
 
   const isFetchingRef = useRef(false)
 
@@ -44,12 +45,13 @@ export default function ExecutiveDashboard() {
     if (isFetchingRef.current) return
     isFetchingRef.current = true
     try {
-      const [srvRes, hvRes, vmRes, incRes, botsRes] = await Promise.all([
+      const [srvRes, hvRes, vmRes, incRes, botsRes, dockerRes] = await Promise.all([
         apiFetch('/api/servers').catch(() => ({ servers: [] })),
         apiFetch('/api/vm/hypervisors').catch(() => ({ hypervisors: [] })),
         apiFetch('/api/vm/all').catch(() => ({ vms: [] })),
         apiFetch('/api/incidents?status=open').catch(() => ({ incidents: [] })),
         apiFetch('/api/telegram/bots').catch(() => []),
+        apiFetch('/api/docker/containers').catch(() => ({ containers: [] })),
       ])
 
       const srvList = srvRes?.servers || (Array.isArray(srvRes) ? srvRes : [])
@@ -58,6 +60,8 @@ export default function ExecutiveDashboard() {
       setVms(vmRes?.vms || [])
       setIncidents(incRes?.incidents || [])
       setBots(Array.isArray(botsRes) ? botsRes : (botsRes?.bots || []))
+      const rawContainers = dockerRes?.containers || (Array.isArray(dockerRes) ? dockerRes : [])
+      setDockerContainers(rawContainers)
       setLastUpdate(new Date())
     } catch (e) {
       console.error('Ошибка опроса Ситуационного Центра:', e)
@@ -129,35 +133,58 @@ export default function ExecutiveDashboard() {
     }
   }
 
-  // Сбор Docker-контейнеров из agent_data без N+1 запросов
+  // Сбор Docker-контейнеров из API /api/docker/containers и agent_data
   const allContainers = []
-  servers.forEach(srv => {
-    const cList = srv.agent_data?.docker_containers || []
-    cList.forEach(c => {
-      let category = 'other'
-      const sId = (srv.id || '').toLowerCase()
-      const cName = (c.name || c.Names?.[0] || '').toLowerCase()
+  const sourceContainers = (dockerContainers && dockerContainers.length > 0)
+    ? dockerContainers
+    : servers.flatMap(srv => (srv.agent_data?.docker_containers || []).map(c => ({
+        ...c,
+        server_id: srv.id,
+        server_name: srv.name || srv.id,
+        server_host: srv.host
+      })))
 
-      if (sId.includes('hrm') || cName.includes('ssvhrm')) {
-        category = 'hrm'
-      } else if (sId.includes('klaster') || cName.includes('davomat') || cName.includes('mukofot') || cName.includes('hisobot') || cName.includes('ayol')) {
-        category = 'klaster'
-      } else if (sId.includes('monitoring') || sId.includes('docker-host') || cName.includes('infrastructure')) {
-        category = 'monitoring'
-      }
+  sourceContainers.forEach(c => {
+    let category = 'other'
+    const sId = (c.server_id || c.server_name || '').toLowerCase()
+    const cName = (c.name || c.Names?.[0] || '').toLowerCase()
 
-      allContainers.push({
-        serverId: srv.id,
-        serverHost: srv.host,
-        name: c.name || c.Names?.[0] || 'unknown',
-        image: c.image || c.Image || '—',
-        status: c.status || c.State || 'running',
-        state: c.state || 'running',
-        category,
-        cpu: typeof c.cpu_percent === 'number' ? c.cpu_percent : (parseFloat(c.cpu_percent) || 0),
-        memMb: typeof c.mem_mb === 'number' ? c.mem_mb : (parseFloat(c.mem_mb) || 0),
-        memPct: typeof c.mem_percent === 'number' ? c.mem_percent : (parseFloat(c.mem_percent) || 0),
-      })
+    if (sId.includes('hrm') || cName.includes('ssvhrm') || cName.includes('hrm')) {
+      category = 'hrm'
+    } else if (
+      sId.includes('klaster') ||
+      cName.includes('davomat') ||
+      cName.includes('mukofot') ||
+      cName.includes('hisobot') ||
+      cName.includes('ayol')
+    ) {
+      category = 'klaster'
+    } else if (
+      sId.includes('monitoring') ||
+      sId.includes('docker-host') ||
+      sId.includes('xsilex') ||
+      cName.includes('infrastructure')
+    ) {
+      category = 'monitoring'
+    }
+
+    const matchingServer = servers.find(
+      s => s.id === c.server_id || s.name === c.server_name || s.id === c.server_name
+    )
+    const serverHost = matchingServer?.host || c.server_host || '192.168.17.x'
+    const serverDisplay = matchingServer?.name || c.server_name || c.server_id || 'Хост'
+
+    allContainers.push({
+      serverId: serverDisplay,
+      serverHost: serverHost,
+      name: c.name || c.Names?.[0] || 'unknown',
+      image: c.image || c.Image || '—',
+      status: c.status || c.State || 'running',
+      state: (c.status || '').toLowerCase().includes('running') ? 'running' : 'stopped',
+      category,
+      cpu: typeof c.cpu_percent === 'number' ? c.cpu_percent : (parseFloat(c.cpu_percent) || 0),
+      memMb: typeof c.mem_mb === 'number' ? c.mem_mb : (parseFloat(c.mem_mb) || 0),
+      memPct: typeof c.mem_percent === 'number' ? c.mem_percent : (parseFloat(c.mem_percent) || 0),
     })
   })
 
@@ -531,7 +558,12 @@ export default function ExecutiveDashboard() {
                 const ram = typeof mets.ram?.value === 'number' ? mets.ram.value : (srv.agent_data?.ram_detail?.percent ?? null)
                 const disk = typeof mets.disk?.value === 'number' ? mets.disk.value : null
                 const uptimeVal = srv.agent_data?.system_info?.uptime_hours ?? mets.uptime_hours?.value
-                const cCount = srv.agent_data?.docker_containers?.length ?? 0
+                const srvContainers = allContainers.filter(
+                  c => c.serverId === srv.name || c.serverId === srv.id || c.serverHost === srv.host
+                )
+                const cCount = srvContainers.length > 0
+                  ? srvContainers.length
+                  : (srv.agent_data?.docker_containers?.length ?? 0)
                 const isOnline = srv.status === 'ok'
 
                 return (
@@ -638,9 +670,9 @@ export default function ExecutiveDashboard() {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[
                   { id: 'all', label: `Все (${allContainers.length})` },
-                  { id: 'hrm', label: 'SSV.HRM (Кадры)' },
-                  { id: 'klaster', label: 'Сервисы учета (Davomat, Mukofot)' },
-                  { id: 'monitoring', label: 'Платформа Мониторинга' },
+                  { id: 'hrm', label: `SSV.HRM (${allContainers.filter(c => c.category === 'hrm').length})` },
+                  { id: 'klaster', label: `Сервисы учета (${allContainers.filter(c => c.category === 'klaster').length})` },
+                  { id: 'monitoring', label: `Платформа Мониторинга (${allContainers.filter(c => c.category === 'monitoring').length})` },
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -671,24 +703,33 @@ export default function ExecutiveDashboard() {
                       <th style={{ padding: '8px 10px' }}>Информационная система / Хост</th>
                       <th style={{ padding: '8px 10px' }}>Имя микросервиса / контейнера</th>
                       <th style={{ padding: '8px 10px' }}>Образ (Image)</th>
+                      <th style={{ padding: '8px 10px' }}>CPU</th>
+                      <th style={{ padding: '8px 10px' }}>Память (RAM)</th>
                       <th style={{ padding: '8px 10px' }}>Статус</th>
                       <th style={{ padding: '8px 10px', textAlign: 'right' }}>Состояние</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredContainers.map((c, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #1e293b' }}>
+                      <tr key={i} style={{ borderBottom: '1px solid #1e293b', transition: 'background 0.15s ease' }}>
                         <td style={{ padding: '8px 10px' }}>
-                          <span style={{ color: '#60a5fa', fontWeight: 600 }}>{c.serverId}</span>
+                          <span style={{ color: '#38bdf8', fontWeight: 600 }}>{c.serverId}</span>
                           <span style={{ color: '#64748b', fontSize: 11, marginLeft: 6 }}>({c.serverHost})</span>
                         </td>
                         <td style={{ padding: '8px 10px', fontWeight: 600, color: '#f8fafc', fontFamily: 'monospace' }}>{c.name}</td>
                         <td style={{ padding: '8px 10px', color: '#94a3b8', fontSize: 11, fontFamily: 'monospace' }}>{c.image}</td>
+                        <td style={{ padding: '8px 10px', color: c.cpu > 70 ? '#f59e0b' : '#f8fafc', fontSize: 11.5, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                          {c.cpu > 0 ? `${c.cpu.toFixed(1)}%` : '< 0.1%'}
+                        </td>
+                        <td style={{ padding: '8px 10px', color: '#94a3b8', fontSize: 11.5, fontVariantNumeric: 'tabular-nums' }}>
+                          {c.memMb > 0 ? `${c.memMb.toFixed(0)} MB` : '—'}
+                          {c.memPct > 0 && <span style={{ color: '#64748b', fontSize: 10.5, marginLeft: 4 }}>({c.memPct.toFixed(1)}%)</span>}
+                        </td>
                         <td style={{ padding: '8px 10px' }}>
                           <span style={{
-                            background: 'rgba(16, 185, 129, 0.1)',
-                            border: '1px solid rgba(16, 185, 129, 0.25)',
-                            color: '#34d399',
+                            background: c.state === 'running' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            border: `1px solid ${c.state === 'running' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                            color: c.state === 'running' ? '#34d399' : '#f87171',
                             padding: '2px 6px',
                             borderRadius: 4,
                             fontWeight: 600,
@@ -698,8 +739,9 @@ export default function ExecutiveDashboard() {
                           </span>
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'right' }}>
-                          <span style={{ color: '#34d399', fontWeight: 600, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} /> Активен
+                          <span style={{ color: c.state === 'running' ? '#34d399' : '#f87171', fontWeight: 600, fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.state === 'running' ? '#10b981' : '#ef4444' }} />
+                            {c.state === 'running' ? 'Активен' : 'Остановлен'}
                           </span>
                         </td>
                       </tr>
