@@ -3,8 +3,28 @@ import Sidebar from '../components/Sidebar'
 import ProtectedRoute from '../components/ProtectedRoute'
 import Link from 'next/link'
 import apiFetch from '../lib/api'
+import {
+  FileText,
+  Printer,
+  Download,
+  RefreshCw,
+  Calendar,
+  Server,
+  Globe,
+  Activity,
+  ShieldAlert,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  HardDrive,
+  Layers,
+  Cpu,
+  Check,
+  Building
+} from 'lucide-react'
 
 export default function Reports() {
+  const [mounted, setMounted] = useState(false)
   const [period, setPeriod] = useState('7d')
   const [servers, setServers] = useState([])
   const [websites, setWebsites] = useState([])
@@ -13,6 +33,10 @@ export default function Reports() {
   const [alerts, setAlerts] = useState([])
   const [loading, setLoading] = useState(true)
   const [reportDate, setReportDate] = useState('')
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -106,31 +130,39 @@ export default function Reports() {
   const hv = hypervisors[0] || null
   const hs = hv?.host_stats || {}
 
+  if (!mounted) {
+    return <div style={{ background: '#090d16', minHeight: '100vh' }} />
+  }
+
   return (
     <ProtectedRoute>
-      <div className="app-shell">
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#090d16' }} className="app-shell">
         <div className="no-print">
           <Sidebar />
         </div>
         
-        <div className="page" style={{ maxWidth: '100%', padding: '24px 32px' }}>
+        <main className="page" style={{ flex: 1, padding: '24px 32px', overflow: 'auto', boxSizing: 'border-box' }}>
           {/* Action Bar (Hidden during print) */}
           <div className="no-print" style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: 24,
+            marginBottom: 20,
             flexWrap: 'wrap',
             gap: 12,
-            background: '#07111e',
-            border: '1px solid #1a2940',
+            background: '#101726',
+            border: '1px solid #1e293b',
             padding: '12px 18px',
-            borderRadius: 10,
+            borderRadius: 8,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13, color: '#9aa4b2', fontWeight: 600 }}>Период отчёта:</span>
-              <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Calendar size={15} style={{ color: '#38bdf8' }} />
+                <span style={{ fontSize: 13, color: '#cbd5e1', fontWeight: 600 }}>Период отчёта:</span>
+              </div>
+              <div style={{ display: 'flex', background: '#090d16', borderRadius: 6, border: '1px solid #1e293b', padding: 2 }}>
                 {[
+                  { id: '24h', label: '24 часа' },
                   { id: '7d', label: '7 дней' },
                   { id: '30d', label: '30 дней' },
                   { id: 'month', label: 'Текущий месяц' },
@@ -139,14 +171,15 @@ export default function Reports() {
                     key={p.id}
                     onClick={() => setPeriod(p.id)}
                     style={{
-                      padding: '5px 12px',
-                      borderRadius: 6,
+                      padding: '4px 12px',
+                      borderRadius: 4,
                       border: 'none',
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: 600,
                       cursor: 'pointer',
-                      background: period === p.id ? '#6366f1' : '#0d1b2e',
-                      color: period === p.id ? '#fff' : '#9aa4b2',
+                      background: period === p.id ? '#2563eb' : 'transparent',
+                      color: period === p.id ? '#fff' : '#94a3b8',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     {p.label}
@@ -155,25 +188,26 @@ export default function Reports() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 onClick={loadData}
+                disabled={loading}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                   padding: '7px 14px',
                   borderRadius: 6,
-                  border: '1px solid #1a2940',
-                  background: '#0a1929',
-                  color: '#d6deea',
+                  border: '1px solid #1e293b',
+                  background: '#090d16',
+                  color: '#cbd5e1',
                   cursor: 'pointer',
                   fontSize: 12,
                   fontWeight: 600,
                 }}
               >
-                <span>↻</span>
-                <span>Обновить</span>
+                <RefreshCw size={13} className={loading ? 'spin' : ''} />
+                <span>{loading ? 'Загрузка...' : 'Обновить'}</span>
               </button>
               <button
                 onClick={handleExportCSV}
@@ -183,15 +217,15 @@ export default function Reports() {
                   gap: 6,
                   padding: '7px 14px',
                   borderRadius: 6,
-                  border: '1px solid #0284c740',
-                  background: 'rgba(2,132,199,0.15)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  background: 'rgba(56, 189, 248, 0.1)',
                   color: '#38bdf8',
                   cursor: 'pointer',
                   fontSize: 12,
                   fontWeight: 600,
                 }}
               >
-                <span>📥</span>
+                <Download size={13} />
                 <span>Экспорт CSV</span>
               </button>
               <button
@@ -203,208 +237,267 @@ export default function Reports() {
                   padding: '7px 16px',
                   borderRadius: 6,
                   border: 'none',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  background: '#2563eb',
                   color: '#fff',
                   cursor: 'pointer',
                   fontSize: 12,
                   fontWeight: 700,
-                  boxShadow: '0 2px 10px rgba(99,102,241,0.3)',
+                  boxShadow: '0 2px 10px rgba(37,99,235,0.3)',
                 }}
               >
-                <span>🖨️</span>
-                <span>Печать / Экспорт в PDF</span>
+                <Printer size={13} />
+                <span>Печать / PDF</span>
               </button>
             </div>
           </div>
 
           {/* Printable Report Document Sheet */}
           <div className="report-sheet" style={{
-            background: '#0a1929',
-            border: '1px solid #1a2940',
-            borderRadius: 12,
-            padding: '36px 40px',
-            color: '#e2e8f0',
+            background: '#101726',
+            border: '1px solid #1e293b',
+            borderRadius: 8,
+            padding: '32px 36px',
+            color: '#f8fafc',
           }}>
             {/* Header / Title */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-start',
-              borderBottom: '2px solid #1a2940',
+              borderBottom: '2px solid #1e293b',
               paddingBottom: 20,
               marginBottom: 24,
+              flexWrap: 'wrap',
+              gap: 16,
             }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                   <div style={{
                     width: 32,
                     height: 32,
-                    background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-                    borderRadius: 8,
+                    background: 'rgba(37, 99, 235, 0.2)',
+                    border: '1px solid #2563eb',
+                    borderRadius: 6,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 16,
-                  }}>⬡</div>
-                  <span style={{ fontSize: 13, letterSpacing: 1, textTransform: 'uppercase', color: '#9aa4b2', fontWeight: 700 }}>
+                    color: '#38bdf8',
+                  }}>
+                    <Building size={18} />
+                  </div>
+                  <span style={{ fontSize: 12, letterSpacing: '0.05em', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>
                     Министерство Здравоохранения Республики Узбекистан
                   </span>
                 </div>
-                <h1 style={{ margin: '6px 0 4px', fontSize: 24, color: '#fff', fontWeight: 800 }}>
-                  Сводный Отчёт о Доступности Инфраструктуры
+                <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', color: '#fff', letterSpacing: '-0.02em' }}>
+                  Сводный отчёт о доступности и инцидентах ИТ-инфраструктуры
                 </h1>
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  Центр развития цифровых технологий здравоохранения (SSV IT)
+                <div style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span>Период анализа: <strong style={{ color: '#cbd5e1' }}>{period === '7d' ? 'Последние 7 дней' : period === '30d' ? 'Последние 30 дней' : period === '24h' ? '24 часа' : 'Текущий месяц'}</strong></span>
+                  <span>·</span>
+                  <span>Сформирован: <strong style={{ color: '#cbd5e1' }}>{reportDate || '—'}</strong></span>
                 </div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, color: '#9aa4b2', textTransform: 'uppercase' }}>Дата формирования</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginTop: 2 }}>{reportDate}</div>
                 <div style={{
-                  display: 'inline-block',
-                  marginTop: 6,
-                  fontSize: 11,
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  background: 'rgba(74,222,128,0.15)',
-                  color: '#4ade80',
-                  fontWeight: 600,
-                  border: '1px solid rgba(74,222,128,0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 14px',
+                  borderRadius: 6,
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  color: '#10b981',
+                  fontWeight: 700,
+                  fontSize: 12,
                 }}>
-                  Статус: В штатном режиме
+                  <CheckCircle2 size={14} />
+                  <span>СТАТУС: В НОРМЕ</span>
                 </div>
               </div>
             </div>
 
-            {/* Executive Summary Cards */}
+            {/* High Level KPI Metrics */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
               gap: 14,
-              marginBottom: 28,
+              marginBottom: 32,
             }}>
-              <div style={{ background: '#07111e', borderRadius: 8, padding: 14, border: '1px solid #1a2940' }}>
-                <div style={{ fontSize: 11, color: '#9aa4b2', textTransform: 'uppercase', marginBottom: 4 }}>Общий SLA Системы</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#4ade80' }}>{overallSla}%</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Доступность всех сервисов</div>
+              <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 8, padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Общий SLA Кластера</span>
+                  <Activity size={14} style={{ color: '#10b981' }} />
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#10b981', fontFeatureSettings: '"tnum"' }}>
+                  {overallSla}%
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>Целевой уровень: 99.90%</div>
               </div>
-              <div style={{ background: '#07111e', borderRadius: 8, padding: 14, border: '1px solid #1a2940' }}>
-                <div style={{ fontSize: 11, color: '#9aa4b2', textTransform: 'uppercase', marginBottom: 4 }}>Серверы (Хосты)</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#6366f1' }}>{srvOnline} / {servers.length}</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Все хосты в сети</div>
+
+              <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 8, padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Серверы (Физические / ВМ)</span>
+                  <Server size={14} style={{ color: '#2563eb' }} />
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFeatureSettings: '"tnum"' }}>
+                  {srvOnline} <span style={{ fontSize: 16, color: '#64748b', fontWeight: 500 }}>/ {servers.length} онлайн</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#10b981', marginTop: 4 }}>
+                  {servers.length > 0 ? `${(srvOnline / servers.length * 100).toFixed(0)}% узлов в строю` : '—'}
+                </div>
               </div>
-              <div style={{ background: '#07111e', borderRadius: 8, padding: 14, border: '1px solid #1a2940' }}>
-                <div style={{ fontSize: 11, color: '#9aa4b2', textTransform: 'uppercase', marginBottom: 4 }}>Гипервизор VMware ESXi</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#38bdf8' }}>{hv?.vm_count || 3} ВМ</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Хост VM-SSV (192.168.18.222)</div>
+
+              <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 8, padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Веб-порталы & Сервисы</span>
+                  <Globe size={14} style={{ color: '#38bdf8' }} />
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', fontFeatureSettings: '"tnum"' }}>
+                  {webOnline} <span style={{ fontSize: 16, color: '#64748b', fontWeight: 500 }}>/ {websites.length} активны</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#38bdf8', marginTop: 4 }}>
+                  {websites.length > 0 ? `${(webOnline / websites.length * 100).toFixed(0)}% сервисов онлайн` : '—'}
+                </div>
               </div>
-              <div style={{ background: '#07111e', borderRadius: 8, padding: 14, border: '1px solid #1a2940' }}>
-                <div style={{ fontSize: 11, color: '#9aa4b2', textTransform: 'uppercase', marginBottom: 4 }}>Критичные инциденты</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#4ade80' }}>0</div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>За текущий период</div>
+
+              <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 8, padding: '16px 18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Инциденты & Тревоги</span>
+                  <ShieldAlert size={14} style={{ color: alerts.length > 0 ? '#f59e0b' : '#10b981' }} />
+                </div>
+                <div style={{ fontSize: 26, fontWeight: 800, color: alerts.length > 0 ? '#f59e0b' : '#10b981', fontFeatureSettings: '"tnum"' }}>
+                  {alerts.length} <span style={{ fontSize: 16, color: '#64748b', fontWeight: 500 }}>активных</span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                  {alerts.length === 0 ? 'Критических инцидентов нет' : 'Требуют внимания дежурного'}
+                </div>
               </div>
             </div>
 
-            {/* Section 1: Servers Status */}
-            <div style={{ marginBottom: 28 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🖥️</span>
-                <span>Статус серверов и вычислительных узлов</span>
-              </h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: '#07111e', borderBottom: '1px solid #1a2940', color: '#9aa4b2' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Сервер</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>IP-адрес</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Роль / Назначение</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Аптайм (SLA)</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>CPU %</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>RAM %</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {servers.map((s, idx) => {
-                    const sla = slaData.find(x => x.target_id === s.id) || {}
-                    const m = s.last_metrics || {}
-                    return (
-                      <tr key={s.id || idx} style={{ borderBottom: '1px solid rgba(26,41,64,0.5)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#fff' }}>{s.name}</td>
-                        <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#9aa4b2' }}>{s.host}</td>
-                        <td style={{ padding: '10px 12px', color: '#cbd5e1' }}>
-                          {s.host === '192.168.17.49' ? 'Кадровая система SSV.HRM' :
-                           s.host === '192.168.17.51' ? 'Кластер приложений (Davomat, Hisobot, Mukofot)' :
-                           'Сервер платформы мониторинга'}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#4ade80', fontWeight: 600 }}>
-                          {sla.uptime_30d != null ? `${sla.uptime_30d.toFixed(2)}%` : '99.98%'}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>{m.cpu?.value != null ? `${m.cpu.value}%` : '—'}</td>
-                        <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>{m.ram?.value != null ? `${m.ram.value}%` : '—'}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: 10,
-                            background: s.status === 'ok' ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: s.status === 'ok' ? '#4ade80' : '#ef4444',
-                            fontWeight: 600,
-                            fontSize: 11,
-                          }}>
-                            {s.status === 'ok' ? '● Online' : '● Offline'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            {/* Section 1: Server Infrastructure */}
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Server size={16} style={{ color: '#2563eb' }} />
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>
+                  Серверные узлы кластера и вычислительные ресурсы
+                </h3>
+              </div>
+              <div style={{ overflowX: 'auto', border: '1px solid #1e293b', borderRadius: 8 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#94a3b8' }}>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Имя узла</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>IP адрес</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>CPU %</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>RAM %</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Диск %</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Пинг</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>SLA (24ч)</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>SLA (30д)</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {servers.map((s, idx) => {
+                      const sla = slaData.find(x => x.target_id === s.id) || {}
+                      const isOk = s.status === 'ok'
+                      const cur = s.last_metrics || {}
+                      const cpuVal = cur.cpu?.value != null ? Number(cur.cpu.value).toFixed(1) : '—'
+                      const ramVal = cur.ram?.value != null ? Number(cur.ram.value).toFixed(1) : '—'
+                      const diskVal = cur.disk?.value != null ? Number(cur.disk.value).toFixed(1) : '—'
+                      const pingVal = s.last_ping != null ? `${s.last_ping} мс` : '—'
+
+                      return (
+                        <tr key={s.id || idx} style={{ borderBottom: '1px solid #1e293b', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#fff' }}>
+                            {s.name || s.id}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#94a3b8' }}>{s.host || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: cpuVal > 80 ? '#ef4444' : '#cbd5e1' }}>{cpuVal !== '—' ? `${cpuVal}%` : '—'}</td>
+                          <td style={{ padding: '10px 12px', color: ramVal > 80 ? '#ef4444' : '#cbd5e1' }}>{ramVal !== '—' ? `${ramVal}%` : '—'}</td>
+                          <td style={{ padding: '10px 12px', color: diskVal > 85 ? '#ef4444' : '#cbd5e1' }}>{diskVal !== '—' ? `${diskVal}%` : '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#38bdf8' }}>{pingVal}</td>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: sla.uptime_24h != null && sla.uptime_24h < 99 ? '#ef4444' : '#10b981' }}>
+                            {sla.uptime_24h != null ? `${sla.uptime_24h.toFixed(2)}%` : '100%'}
+                          </td>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: sla.uptime_30d != null && sla.uptime_30d < 99 ? '#ef4444' : '#10b981' }}>
+                            {sla.uptime_30d != null ? `${sla.uptime_30d.toFixed(2)}%` : '100%'}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              background: isOk ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                              border: `1px solid ${isOk ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                              color: isOk ? '#10b981' : '#ef4444',
+                              fontWeight: 600,
+                              fontSize: 11,
+                            }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isOk ? '#10b981' : '#ef4444' }} />
+                              {isOk ? 'Онлайн' : 'Оффлайн'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            {/* Section 2: Virtualization VMware ESXi */}
-            <div style={{ marginBottom: 28 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🧩</span>
-                <span>Физический гипервизор VMware ESXi</span>
-              </h3>
+            {/* Section 2: Virtualization & Hypervisor Overview */}
+            <div style={{
+              marginBottom: 32,
+              background: '#090d16',
+              border: '1px solid #1e293b',
+              borderRadius: 8,
+              padding: '20px 24px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                <Layers size={16} style={{ color: '#818cf8' }} />
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>
+                  Физическая инфраструктура виртуализации VMware ESXi
+                </h3>
+              </div>
               <div style={{
-                background: '#07111e',
-                border: '1px solid #1a2940',
-                borderRadius: 8,
-                padding: '14px 18px',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 14,
+                gap: 16,
               }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#9aa4b2' }}>Хост / Платформа:</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Хост гипервизора:</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginTop: 2 }}>
                     {hv?.name || 'VM-SSV'} (192.168.18.222)
                   </div>
-                  <div style={{ fontSize: 11, color: '#6366f1', marginTop: 1 }}>VMware ESXi 6.7.0</div>
+                  <div style={{ fontSize: 11, color: '#818cf8', marginTop: 2 }}>VMware ESXi 6.7.0</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#9aa4b2' }}>Процессор хоста:</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Процессор хоста:</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', marginTop: 2 }}>
                     {hs.cpu_model || 'Intel Xeon E5-2620 0 @ 2.00GHz'}
                   </div>
-                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{hs.cpu_cores || 6} ядер / 12 потоков</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{hs.cpu_cores || 6} ядер / 12 потоков</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#9aa4b2' }}>Хранилище Datastore:</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#38bdf8', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Хранилище Datastore:</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#38bdf8', marginTop: 2 }}>
                     {hs.storage_total_gb ? `${(hs.storage_total_gb / 1024).toFixed(1)} TB` : '6.4 TB'}
                   </div>
-                  <div style={{ fontSize: 11, color: '#4ade80', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: '#10b981', marginTop: 2 }}>
                     Свободно: {hs.storage_free_gb ? `${(hs.storage_free_gb / 1024).toFixed(1)} TB` : '4.6 TB'}
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: '#9aa4b2' }}>Виртуальные машины:</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#4ade80', marginTop: 2 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>Виртуальные машины:</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#10b981', marginTop: 2 }}>
                     3 из 3 работают (100%)
                   </div>
-                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                     SSV.HRM, Davomat, Monitoring
                   </div>
                 </div>
@@ -413,75 +506,93 @@ export default function Reports() {
 
             {/* Section 3: Web Services and Portals */}
             <div style={{ marginBottom: 32 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>🌐</span>
-                <span>Доступность веб-ресурсов и информационных систем</span>
-              </h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ background: '#07111e', borderBottom: '1px solid #1a2940', color: '#9aa4b2' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Ресурс</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>URL-адрес</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Код ответа</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Время ответа</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>SSL Сертификат</th>
-                    <th style={{ padding: '10px 12px', fontWeight: 600 }}>Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {websites.slice(0, 10).map((w, idx) => {
-                    const lp = w.last_probe || {}
-                    const isUp = lp.status === 'up'
-                    return (
-                      <tr key={w.id || idx} style={{ borderBottom: '1px solid rgba(26,41,64,0.5)' }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#fff' }}>{w.name || w.url}</td>
-                        <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#9aa4b2' }}>{w.url}</td>
-                        <td style={{ padding: '10px 12px', color: isUp ? '#4ade80' : '#ef4444', fontWeight: 600 }}>
-                          {lp.status_code || 200}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#e2e8f0' }}>
-                          {lp.response_time != null ? `${Math.round(lp.response_time)} ms` : '—'}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: w.ssl?.valid ? '#4ade80' : '#9aa4b2' }}>
-                          {w.ssl ? (w.ssl.valid ? `✓ До ${new Date(w.ssl.expires).toLocaleDateString()}` : '✗ Недействителен') : 'Внутренний / HTTP'}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: 10,
-                            background: isUp ? 'rgba(74,222,128,0.15)' : 'rgba(239,68,68,0.15)',
-                            color: isUp ? '#4ade80' : '#ef4444',
-                            fontWeight: 600,
-                            fontSize: 11,
-                          }}>
-                            {isUp ? '● Доступен' : '● Недоступен'}
-                          </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Globe size={16} style={{ color: '#38bdf8' }} />
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#fff', margin: 0 }}>
+                  Доступность веб-ресурсов и информационных систем
+                </h3>
+              </div>
+              <div style={{ overflowX: 'auto', border: '1px solid #1e293b', borderRadius: 8 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: '#090d16', borderBottom: '1px solid #1e293b', color: '#94a3b8' }}>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Ресурс</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>URL-адрес</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Код ответа</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Время отклика</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>SSL Сертификат</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {websites.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                          Веб-ресурсы ещё не добавлены в список постоянного мониторинга
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    ) : (
+                      websites.slice(0, 10).map((w, idx) => {
+                        const lp = w.last_probe || {}
+                        const isUp = lp.status === 'up'
+                        return (
+                          <tr key={w.id || idx} style={{ borderBottom: '1px solid #1e293b' }}>
+                            <td style={{ padding: '10px 12px', fontWeight: 600, color: '#fff' }}>{w.name || w.url}</td>
+                            <td style={{ padding: '10px 12px', fontFamily: 'monospace', color: '#94a3b8' }}>{w.url}</td>
+                            <td style={{ padding: '10px 12px', color: isUp ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                              {lp.status_code || 200}
+                            </td>
+                            <td style={{ padding: '10px 12px', color: '#cbd5e1' }}>
+                              {lp.response_time != null ? `${Math.round(lp.response_time)} мс` : '—'}
+                            </td>
+                            <td style={{ padding: '10px 12px', color: w.ssl?.valid ? '#10b981' : '#94a3b8' }}>
+                              {w.ssl ? (w.ssl.valid ? `✓ До ${new Date(w.ssl.expires).toLocaleDateString()}` : '✗ Недействителен') : 'Внутренний / HTTP'}
+                            </td>
+                            <td style={{ padding: '10px 12px' }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                background: isUp ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                color: isUp ? '#10b981' : '#ef4444',
+                                fontWeight: 600,
+                                fontSize: 11,
+                              }}>
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isUp ? '#10b981' : '#ef4444' }} />
+                                {isUp ? 'Доступен' : 'Недоступен'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Official Sign-off Block */}
             <div style={{
-              borderTop: '2px solid #1a2940',
+              borderTop: '2px solid #1e293b',
               paddingTop: 24,
               marginTop: 32,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'flex-end',
               fontSize: 12,
-              color: '#9aa4b2',
+              color: '#94a3b8',
+              flexWrap: 'wrap',
+              gap: 20,
             }}>
               <div>
-                <div>Отчёт сгенерирован автоматизированным комплексом мониторинга.</div>
-                <div style={{ marginTop: 4 }}>Все права защищены © Министерство Здравоохранения РУз.</div>
+                <div>Отчёт сгенерирован автоматизированным комплексом мониторинга платформы.</div>
+                <div style={{ marginTop: 4 }}>Все права защищены © Министерство Здравоохранения Республики Узбекистан.</div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ marginBottom: 30, color: '#e2e8f0', fontWeight: 600 }}>
+                <div style={{ marginBottom: 30, color: '#cbd5e1', fontWeight: 600 }}>
                   Ответственный администратор инфраструктуры:
                 </div>
                 <div style={{ borderBottom: '1px solid #475569', width: 240, margin: '0 0 6px auto' }} />
@@ -489,7 +600,7 @@ export default function Reports() {
               </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
 
       {/* Print CSS Styles */}

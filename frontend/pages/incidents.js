@@ -585,6 +585,8 @@ export default function Incidents() {
     }
   }
 
+  if (!mounted) return null
+
   return (
     <ProtectedRoute>
       <div style={{ display: 'flex', minHeight: '100vh', background: '#090d16' }}>

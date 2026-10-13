@@ -3,43 +3,97 @@ import { useRouter } from 'next/router'
 import Sidebar from '../../components/Sidebar'
 import ProtectedRoute from '../../components/ProtectedRoute'
 import apiFetch, { dashboardsApi } from '../../lib/api'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts'
+import {
+  LayoutDashboard,
+  Plus,
+  Trash2,
+  Edit3,
+  ArrowLeft,
+  Box,
+  Activity,
+  CheckCircle2,
+  AlertTriangle,
+  Server,
+  Clock,
+  Layers,
+  Settings,
+  X,
+  Check
+} from 'lucide-react'
 
-const WIDGET_TYPES = ['metric_chart', 'uptime_bar', 'alert_list', 'server_status', 'stats_card']
+const WIDGET_TYPES = [
+  { id: 'metric_chart', label: 'График метрики (Area)', desc: 'Временной ряд CPU, RAM, Disk или Ping' },
+  { id: 'stats_card', label: 'Карточка показателя', desc: 'Текущее числовое значение и статус' },
+  { id: 'server_status', label: 'Сводка серверов', desc: 'Количество онлайн/оффлайн узлов' },
+  { id: 'uptime_bar', label: 'Индикатор доступности', desc: 'SLA доступность за 24ч, 7д и 30д' },
+  { id: 'alert_list', label: 'Список активных алертов', desc: 'Последние критические события' },
+]
 
 function WidgetModal({ dashboardId, widget, onClose, onSaved }) {
   const isEdit = !!widget
+  const [servers, setServers] = useState([])
+  const [showAdvancedJson, setShowAdvancedJson] = useState(false)
+  
   const [form, setForm] = useState({
-    widget_type: widget?.widget_type || WIDGET_TYPES[0],
+    widget_type: widget?.widget_type || 'metric_chart',
     title: widget?.title || '',
-    config: JSON.stringify(widget?.config || {}, null, 2),
-    position_x: widget?.position_x ?? 0,
-    position_y: widget?.position_y ?? 0,
-    width: widget?.width ?? 4,
-    height: widget?.height ?? 3,
+    server_id: widget?.config?.server_id || '',
+    metric: widget?.config?.metric || 'cpu',
+    unit: widget?.config?.unit || '%',
+    width: widget?.width ?? 3,
+    height: widget?.height ?? 2,
+    raw_config: JSON.stringify(widget?.config || {}, null, 2),
   })
+  
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    apiFetch('/api/servers')
+      .then(d => {
+        const srvs = d.servers || []
+        setServers(srvs)
+        if (srvs.length > 0 && !form.server_id) {
+          setForm(f => ({ ...f, server_id: srvs[0].id }))
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   const submit = async () => {
-    let config
-    try {
-      config = form.config.trim() ? JSON.parse(form.config) : {}
-    } catch (e) {
-      setError('Config должен быть корректным JSON')
-      return
-    }
     setLoading(true)
     setError(null)
+    
+    let config = {}
+    if (showAdvancedJson) {
+      try {
+        config = form.raw_config.trim() ? JSON.parse(form.raw_config) : {}
+      } catch {
+        setError('Неверный формат JSON в конфигурации')
+        setLoading(false)
+        return
+      }
+    } else {
+      if (['metric_chart', 'stats_card', 'uptime_bar'].includes(form.widget_type)) {
+        config = {
+          server_id: form.server_id,
+          metric: form.metric,
+          unit: form.unit,
+        }
+      }
+    }
+
     const payload = {
       widget_type: form.widget_type,
-      title: form.title || null,
+      title: form.title.trim() || WIDGET_TYPES.find(w => w.id === form.widget_type)?.label || 'Виджет',
       config,
-      position_x: Number(form.position_x) || 0,
-      position_y: Number(form.position_y) || 0,
-      width: Number(form.width) || 4,
-      height: Number(form.height) || 3,
+      position_x: 0,
+      position_y: 0,
+      width: Number(form.width) || 3,
+      height: Number(form.height) || 2,
     }
+
     try {
       if (isEdit) {
         await dashboardsApi.updateWidget(dashboardId, widget.id, payload)
@@ -55,56 +109,152 @@ function WidgetModal({ dashboardId, widget, onClose, onSaved }) {
     }
   }
 
-  const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #1e2330', background: '#0f1117', color: '#e2e8f0', fontSize: 13, marginBottom: 10, boxSizing: 'border-box' }
+  const inputStyle = {
+    width: '100%',
+    padding: '8px 12px',
+    borderRadius: 6,
+    border: '1px solid #1e293b',
+    background: '#090d16',
+    color: '#f8fafc',
+    fontSize: 12,
+    marginBottom: 12,
+    outline: 'none',
+    boxSizing: 'border-box',
+  }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#000000aa', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="card" style={{ width: 460, padding: 24, maxHeight: '85vh', overflow: 'auto' }}>
-        <h3 style={{ color: '#e2e8f0', marginBottom: 16, fontSize: 16 }}>{isEdit ? 'Редактировать виджет' : 'Новый виджет'}</h3>
-        {error && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{error}</div>}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ width: 480, maxHeight: '90vh', overflowY: 'auto', background: '#101726', border: '1px solid #1e293b', borderRadius: 8, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ color: '#fff', margin: 0, fontSize: 16, fontWeight: 700 }}>
+            {isEdit ? 'Настройка виджета' : 'Добавить виджет на дашборд'}
+          </h3>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer' }}>
+            <X size={18} />
+          </button>
+        </div>
 
-        <label style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Тип</label>
+        {error && (
+          <div style={{ color: '#f87171', fontSize: 12, marginBottom: 14, padding: '8px 12px', background: '#ef444415', border: '1px solid #ef444430', borderRadius: 6 }}>
+            {error}
+          </div>
+        )}
+
+        <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>ТИП ВИДЖЕТА</label>
         <select
           value={form.widget_type}
           onChange={e => setForm(f => ({ ...f, widget_type: e.target.value }))}
           style={inputStyle}
         >
-          {WIDGET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          {WIDGET_TYPES.map(t => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
         </select>
 
-        <label style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Заголовок</label>
+        <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>ЗАГОЛОВОК</label>
         <input
+          placeholder="Например: Загрузка CPU кластера"
           value={form.title}
           onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
           style={inputStyle}
         />
 
-        <label style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase' }}>Config (JSON)</label>
-        <textarea
-          value={form.config}
-          onChange={e => setForm(f => ({ ...f, config: e.target.value }))}
-          rows={5}
-          style={{ ...inputStyle, fontFamily: 'monospace', resize: 'vertical' }}
-        />
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-          {['position_x', 'position_y', 'width', 'height'].map(key => (
-            <div key={key}>
-              <label style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase' }}>{key}</label>
-              <input
-                type="number"
-                value={form[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                style={inputStyle}
-              />
+        {['metric_chart', 'stats_card', 'uptime_bar'].includes(form.widget_type) && !showAdvancedJson && (
+          <div style={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, padding: '12px 14px', marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: '#38bdf8', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Settings size={13} />
+              <span>Параметры источника телеметрии</span>
             </div>
-          ))}
+            
+            <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>СЕРВЕР</label>
+            <select
+              value={form.server_id}
+              onChange={e => setForm(f => ({ ...f, server_id: e.target.value }))}
+              style={{ ...inputStyle, marginBottom: 10 }}
+            >
+              {servers.map(s => (
+                <option key={s.id} value={s.id}>{s.name || s.id} ({s.host || 'agent'})</option>
+              ))}
+            </select>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>МЕТРИКА</label>
+                <select
+                  value={form.metric}
+                  onChange={e => {
+                    const m = e.target.value
+                    const u = m === 'ping' ? 'мс' : m === 'processes' ? '' : '%'
+                    setForm(f => ({ ...f, metric: m, unit: u }))
+                  }}
+                  style={{ ...inputStyle, marginBottom: 0 }}
+                >
+                  <option value="cpu">CPU %</option>
+                  <option value="ram">RAM %</option>
+                  <option value="disk">Диск %</option>
+                  <option value="swap">Swap %</option>
+                  <option value="ping">Пинг (мс)</option>
+                  <option value="processes">Процессы</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 10, color: '#64748b', display: 'block', marginBottom: 4 }}>ЕД. ИЗМЕРЕНИЯ</label>
+                <input
+                  value={form.unit}
+                  onChange={e => setForm(f => ({ ...f, unit: e.target.value }))}
+                  style={{ ...inputStyle, marginBottom: 0 }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 11, color: '#64748b' }}>Режим настройки:</span>
+          <button
+            type="button"
+            onClick={() => setShowAdvancedJson(!showAdvancedJson)}
+            style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: 11, cursor: 'pointer', padding: 0 }}
+          >
+            {showAdvancedJson ? '← Простой визуальный режим' : 'JSON конфигуратор →'}
+          </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#1e2330', color: '#9aa4b2', fontSize: 13 }}>Отмена</button>
-          <button onClick={submit} disabled={loading} style={{ padding: '8px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#3b82f6', color: '#fff', fontSize: 13, opacity: loading ? 0.7 : 1 }}>
-            {loading ? 'Сохранение...' : 'Сохранить'}
+        {showAdvancedJson && (
+          <div>
+            <label style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: 4 }}>CONFIG (RAW JSON)</label>
+            <textarea
+              value={form.raw_config}
+              onChange={e => setForm(f => ({ ...f, raw_config: e.target.value }))}
+              rows={4}
+              style={{ ...inputStyle, fontFamily: 'monospace', resize: 'vertical' }}
+            />
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #1e293b', cursor: 'pointer', background: 'transparent', color: '#94a3b8', fontSize: 12, fontWeight: 600 }}
+          >
+            Отмена
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 6,
+              border: 'none',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              background: '#2563eb',
+              color: '#fff',
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {loading ? 'Сохранение...' : 'Сохранить виджет'}
           </button>
         </div>
       </div>
@@ -126,114 +276,119 @@ function MetricChartWidget({ serverId, metric, title }) {
           const val = mets[metric]?.value
           const t = new Date(m.received_at ? m.received_at * 1000 : Date.now())
           return {
-            time: t.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}),
+            time: t.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
             value: typeof val === 'number' ? val : 0
           }
         })
         setData(points)
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [serverId, metric])
 
-  if (loading) return <div style={{height:120, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b', fontSize:12}}>Загрузка графика...</div>
-  if (data.length === 0) return <div style={{height:120, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b', fontSize:12}}>Нет данных</div>
+  if (loading) return <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 11 }}>Загрузка телеметрии...</div>
+  if (data.length === 0) return <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 11 }}>Нет данных</div>
 
   return (
-    <div style={{height:120, width:'100%', marginTop:8}}>
+    <div style={{ height: 110, width: '100%', marginTop: 8 }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{top:5, right:5, left:-20, bottom:5}}>
-          <Tooltip contentStyle={{background:'#071226', border:'1px solid #1a2940', borderRadius:6, fontSize:11}}/>
-          <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f630" strokeWidth={1.5} dot={false}/>
+        <AreaChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`grad-${metric}-${serverId}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <Tooltip contentStyle={{ background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, fontSize: 11 }} />
+          <Area type="monotone" dataKey="value" stroke="#38bdf8" fill={`url(#grad-${metric}-${serverId})`} strokeWidth={2} dot={false} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-function StatsCardWidget({ serverId, metric, title, unit }) {
-  const [value, setValue] = useState(null)
-  const [loading, setLoading] = useState(true)
+function StatsCardWidget({ serverId, metric, title, unit = '%' }) {
+  const [val, setVal] = useState(null)
 
   useEffect(() => {
-    if (!serverId || !metric) return
+    if (!serverId) return
     apiFetch(`/api/servers/${serverId}/detail`)
       .then(res => {
-        const detail = res?.detail || {}
-        const metrics = detail.last_metrics || detail.metrics || {}
-        const val = metrics[metric]?.value ?? metrics[metric]
-        setValue(val)
+        const d = res.detail || {}
+        if (metric === 'cpu') setVal(d.cpu_detail?.total_percent ?? null)
+        else if (metric === 'ram') setVal(d.ram_detail?.used_percent ?? null)
+        else if (metric === 'disk') setVal(d.disks?.[0]?.percent ?? null)
+        else setVal(null)
       })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+      .catch(() => {})
   }, [serverId, metric])
 
-  if (loading) return <div style={{fontSize:24, fontWeight:700, color:'#64748b', padding:10}}>Загрузка...</div>
+  const numVal = typeof val === 'number' ? val : 0
+  const color = numVal > 80 ? '#ef4444' : numVal > 60 ? '#f59e0b' : '#10b981'
 
   return (
-    <div style={{display:'flex', alignItems:'baseline', gap:4, marginTop:10}}>
-      <div style={{fontSize:32, fontWeight:700, color:'#3b82f6'}}>{typeof value === 'number' ? value.toFixed(1) : (value ?? '—')}</div>
-      <div style={{fontSize:14, color:'#64748b'}}>{unit || '%'}</div>
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 28, fontWeight: 700, color, fontFeatureSettings: '"tnum"' }}>
+        {val != null ? `${numVal.toFixed(1)} ${unit}` : '—'}
+      </div>
+      <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+        Хост: <span style={{ color: '#94a3b8' }}>{serverId}</span>
+      </div>
     </div>
   )
 }
 
 function ServerStatusWidget() {
   const [servers, setServers] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     apiFetch('/api/servers')
-      .then(res => {
-        const list = Array.isArray(res) ? res : (res.servers || [])
-        setServers(list)
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+      .then(res => setServers(res.servers || []))
+      .catch(() => {})
   }, [])
 
-  if (loading) return <div style={{color:'#64748b', fontSize:12, padding:10}}>Загрузка...</div>
+  const online = servers.filter(s => s.status === 'ok').length
+  const total = servers.length
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:8, marginTop:8}}>
-      {servers.map(s => (
-        <div key={s.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', background:'#0d172650', padding:'6px 10px', borderRadius:6}}>
-          <span style={{fontSize:13, fontWeight:600, color:'#e2e8f0'}}>{s.name || s.id}</span>
-          <span style={{fontSize:11, padding:'2px 8px', borderRadius:10, background: s.status === 'ok' ? '#4ade8022' : '#ef444422', color: s.status === 'ok' ? '#4ade80' : '#ef4444', fontWeight:600}}>
-            {s.status === 'ok' ? 'Online' : 'Offline'}
-          </span>
-        </div>
-      ))}
+    <div style={{ display: 'flex', gap: 14, marginTop: 12 }}>
+      <div style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, padding: '10px 12px' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>{online}</div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>ОНЛАЙН</div>
+      </div>
+      <div style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, padding: '10px 12px' }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: total - online > 0 ? '#ef4444' : '#64748b' }}>{total - online}</div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>ОФФЛАЙН</div>
+      </div>
     </div>
   )
 }
 
 function UptimeBarWidget({ serverId }) {
-  const [pct, setPct] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [sla, setSla] = useState(null)
 
   useEffect(() => {
     if (!serverId) return
-    apiFetch(`/api/servers/${serverId}/uptime`)
+    apiFetch('/api/sla/summary')
       .then(res => {
-        setPct(res?.uptime_30d ?? 100.0)
+        const item = (res.summary || []).find(s => s.target_id === serverId)
+        setSla(item || null)
       })
-      .catch(() => setPct(99.9))
-      .finally(() => setLoading(false))
+      .catch(() => {})
   }, [serverId])
 
-  if (loading) return <div style={{color:'#64748b', fontSize:12, padding:10}}>Загрузка...</div>
-
-  const color = pct >= 99.9 ? '#4ade80' : pct >= 99.0 ? '#facc15' : '#ef4444'
+  const u24 = sla?.uptime_24h != null ? sla.uptime_24h.toFixed(1) + '%' : '100%'
+  const u30 = sla?.uptime_30d != null ? sla.uptime_30d.toFixed(1) + '%' : '100%'
 
   return (
-    <div style={{marginTop:10}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:6}}>
-        <span style={{fontSize:28, fontWeight:700, color}}>{pct?.toFixed(2)}%</span>
-        <span style={{fontSize:11, color:'#64748b'}}>SLA (30 дней)</span>
+    <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+      <div style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, padding: '8px 10px' }}>
+        <div style={{ fontSize: 10, color: '#64748b' }}>24 ЧАСА</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981', marginTop: 2 }}>{u24}</div>
       </div>
-      <div style={{height:8, width:'100%', background:'#1a2940', borderRadius:4, overflow:'hidden'}}>
-        <div style={{height:'100%', width:`${pct}%`, background:color, borderRadius:4, transition:'width 0.5s ease'}}/>
+      <div style={{ flex: 1, background: '#090d16', border: '1px solid #1e293b', borderRadius: 6, padding: '8px 10px' }}>
+        <div style={{ fontSize: 10, color: '#64748b' }}>30 ДНЕЙ</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#10b981', marginTop: 2 }}>{u30}</div>
       </div>
     </div>
   )
@@ -244,24 +399,29 @@ function AlertListWidget() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    apiFetch('/api/alerts')
+    apiFetch('/api/alerts?limit=5')
       .then(res => {
-        const list = Array.isArray(res) ? res : (res.alerts || [])
-        setAlerts(list.filter(a => a.is_active || a.status === 'active').slice(0, 5))
+        const list = res.alerts || []
+        setAlerts(list.filter(a => a.status === 'firing').slice(0, 3))
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div style={{color:'#64748b', fontSize:12, padding:10}}>Загрузка...</div>
-  if (alerts.length === 0) return <div style={{color:'#4ade80', fontSize:12, padding:10, fontWeight:600}}>✓ Все системы работают штатно. Нет активных алертов.</div>
+  if (loading) return <div style={{ color: '#64748b', fontSize: 11, padding: 10 }}>Загрузка...</div>
+  if (alerts.length === 0) return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', fontSize: 11, marginTop: 12 }}>
+      <CheckCircle2 size={13} />
+      <span>Активных тревог нет</span>
+    </div>
+  )
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:6, marginTop:8}}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
       {alerts.map((a, i) => (
-        <div key={i} style={{fontSize:12, background:'#ef44440a', borderLeft:'3px solid #ef4444', padding:'6px 10px', borderRadius:4}}>
-          <div style={{fontWeight:600, color:'#e2e8f0'}}>{a.title || a.message}</div>
-          <div style={{fontSize:10, color:'#64748b', marginTop:2}}>{a.server_id} · {new Date(a.created_at || Date.now()).toLocaleTimeString()}</div>
+        <div key={i} style={{ fontSize: 11, background: '#ef444410', borderLeft: '3px solid #ef4444', padding: '6px 8px', borderRadius: 4 }}>
+          <div style={{ fontWeight: 600, color: '#fff' }}>{a.title || a.message}</div>
+          <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2 }}>{a.server_id}</div>
         </div>
       ))}
     </div>
@@ -273,10 +433,10 @@ function WidgetCard({ widget, onEdit, onDelete }) {
   
   const renderContent = () => {
     if (widget.widget_type === 'metric_chart') {
-      return <MetricChartWidget serverId={cfg.server_id} metric={cfg.metric} title={widget.title}/>
+      return <MetricChartWidget serverId={cfg.server_id} metric={cfg.metric} title={widget.title} />
     }
     if (widget.widget_type === 'stats_card') {
-      return <StatsCardWidget serverId={cfg.server_id} metric={cfg.metric} title={widget.title} unit={cfg.unit}/>
+      return <StatsCardWidget serverId={cfg.server_id} metric={cfg.metric} title={widget.title} unit={cfg.unit} />
     }
     if (widget.widget_type === 'server_status') {
       return <ServerStatusWidget />
@@ -288,29 +448,51 @@ function WidgetCard({ widget, onEdit, onDelete }) {
       return <AlertListWidget />
     }
     return (
-      <pre style={{ fontSize: 11, color: '#9aa4b2', background: '#0d1726', padding: 10, borderRadius: 6, overflow: 'auto', maxHeight: 160, margin: '8px 0 0 0' }}>
+      <pre style={{ fontSize: 10, color: '#94a3b8', background: '#090d16', padding: 8, borderRadius: 4, overflow: 'auto', maxHeight: 120 }}>
         {JSON.stringify(widget.config, null, 2)}
       </pre>
     )
   }
 
   return (
-    <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 180 }}>
+    <div style={{
+      background: '#101726',
+      border: '1px solid #1e293b',
+      borderRadius: 8,
+      padding: '16px 18px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      minHeight: 180,
+    }}>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>{widget.widget_type}</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{widget.title || '(без названия)'}</div>
+            <div style={{ fontSize: 10, color: '#64748b', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.04em' }}>
+              {WIDGET_TYPES.find(t => t.id === widget.widget_type)?.label || widget.widget_type}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginTop: 2 }}>
+              {widget.title || '(без названия)'}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={() => onEdit(widget)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#1e2330', color: '#9aa4b2', fontSize: 12 }}>✎</button>
-            <button onClick={() => onDelete(widget)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', background: '#7f1d1d', color: '#ef4444', fontSize: 12 }}>✕</button>
+            <button
+              onClick={() => onEdit(widget)}
+              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #1e293b', cursor: 'pointer', background: '#090d16', color: '#94a3b8' }}
+              title="Настроить"
+            >
+              <Edit3 size={12} />
+            </button>
+            <button
+              onClick={() => onDelete(widget)}
+              style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}
+              title="Удалить"
+            >
+              <Trash2 size={12} />
+            </button>
           </div>
         </div>
         {renderContent()}
-      </div>
-      <div style={{ fontSize: 10, color: '#64748b', marginTop: 8, borderTop: '1px solid #1e2330', paddingTop: 6 }}>
-        позиция: {widget.position_x},{widget.position_y} · размер: {widget.width}x{widget.height}
       </div>
     </div>
   )
@@ -324,7 +506,7 @@ export default function DashboardDetail() {
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [modalWidget, setModalWidget] = useState(undefined) // undefined = closed, null = new, object = edit
+  const [modalWidget, setModalWidget] = useState(undefined)
 
   const load = async () => {
     try {
@@ -367,56 +549,124 @@ export default function DashboardDetail() {
 
   return (
     <ProtectedRoute>
-      <div style={{ display: 'flex', minHeight: '100vh', background: '#0f1117' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#090d16', color: '#f8fafc' }}>
         <Sidebar />
-        <main style={{ flex: 1, padding: '32px 40px', overflow: 'auto' }}>
+        <main style={{ flex: 1, padding: '24px 32px', overflow: 'auto' }}>
           <button
             onClick={() => router.push('/dashboards')}
-            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, cursor: 'pointer', marginBottom: 16, padding: 0 }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'none',
+              border: 'none',
+              color: '#38bdf8',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 16,
+              padding: 0,
+            }}
           >
-            ← Все дашборды
+            <ArrowLeft size={14} />
+            <span>Все дашборды</span>
           </button>
 
-          {loading && <div style={{ color: '#9aa4b2' }}>Загрузка...</div>}
-          {error && <div style={{ color: '#ef4444', marginBottom: 12 }}>Ошибка: {error}</div>}
+          {loading && <div style={{ color: '#64748b', padding: 20 }}>Загрузка...</div>}
+          {error && <div style={{ color: '#ef4444', marginBottom: 12, padding: 10, background: '#ef444415', borderRadius: 6 }}>Ошибка: {error}</div>}
 
           {dashboard && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
                 <div>
-                  <h1 style={{ fontSize: 24, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>{dashboard.name}</h1>
-                  {dashboard.description && <p style={{ color: '#64748b', fontSize: 13 }}>{dashboard.description}</p>}
-                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                    {dashboard.is_public ? 'Публичный' : 'Приватный'} · обновлён {dashboard.updated_at ? new Date(dashboard.updated_at).toLocaleString('ru') : '—'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <h1 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: 0, letterSpacing: '-0.02em' }}>
+                      {dashboard.name}
+                    </h1>
+                    <span style={{
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      background: dashboard.is_public ? '#2563eb18' : '#1e293b',
+                      color: dashboard.is_public ? '#38bdf8' : '#94a3b8',
+                      border: `1px solid ${dashboard.is_public ? '#2563eb35' : '#334155'}`,
+                    }}>
+                      {dashboard.is_public ? 'Публичный' : 'Приватный'}
+                    </span>
                   </div>
+                  {dashboard.description && <p style={{ color: '#94a3b8', fontSize: 12, margin: '4px 0 0' }}>{dashboard.description}</p>}
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     onClick={() => setModalWidget(null)}
-                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#3b82f6', color: '#fff', fontSize: 13, fontWeight: 600 }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: '#2563eb',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
                   >
-                    + Виджет
+                    <Plus size={14} />
+                    <span>Добавить виджет</span>
                   </button>
                   <button
                     onClick={deleteDashboard}
-                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#7f1d1d', color: '#ef4444', fontSize: 13, fontWeight: 600 }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '7px 14px',
+                      borderRadius: 6,
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      cursor: 'pointer',
+                      background: 'rgba(239,68,68,0.1)',
+                      color: '#ef4444',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
                   >
-                    Удалить дашборд
+                    <Trash2 size={13} />
+                    <span>Удалить дашборд</span>
                   </button>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
                 {(dashboard.widgets || []).map(w => (
                   <WidgetCard key={w.id} widget={w} onEdit={setModalWidget} onDelete={deleteWidget} />
                 ))}
               </div>
 
               {(dashboard.widgets || []).length === 0 && (
-                <div style={{ textAlign: 'center', padding: 80, color: '#64748b' }}>
-                  <div style={{ fontSize: 40, marginBottom: 16 }}>🧩</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: '#e2e8f0', marginBottom: 8 }}>Нет виджетов</div>
-                  <div style={{ fontSize: 13 }}>Добавьте первый виджет на этот дашборд</div>
+                <div style={{ textAlign: 'center', padding: 70, background: '#101726', border: '1px solid #1e293b', borderRadius: 8 }}>
+                  <div style={{ padding: 12, borderRadius: 10, background: '#2563eb15', color: '#38bdf8', display: 'inline-block', marginBottom: 12 }}>
+                    <Box size={32} />
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: '#fff', marginBottom: 6 }}>Нет виджетов на дашборде</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 20 }}>Добавьте первый график или индикатор состояния сервисов</div>
+                  <button
+                    onClick={() => setModalWidget(null)}
+                    style={{
+                      padding: '8px 18px',
+                      borderRadius: 6,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: '#2563eb',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    + Добавить виджет
+                  </button>
                 </div>
               )}
             </>
